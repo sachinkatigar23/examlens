@@ -1,10 +1,18 @@
 import { Document } from '../models/Document.js';
+import { Message } from '../models/Message.js';
+import { Question } from '../models/Question.js';
+import { Topic } from '../models/Topic.js';
 import { removeDocument } from './documentService.js';
 
 // Deleting a space deletes everything inside it.
 export async function deleteSpaceCascade(space) {
   const documents = await Document.find({ space: space._id });
-  for (const doc of documents) await removeDocument(doc);
+  for (const doc of documents) await removeDocument(doc, { rematch: false });
+  await Promise.all([
+    Message.deleteMany({ space: space._id }),
+    Question.deleteMany({ space: space._id }),
+    Topic.deleteMany({ space: space._id }),
+  ]);
   await space.deleteOne();
 }
 

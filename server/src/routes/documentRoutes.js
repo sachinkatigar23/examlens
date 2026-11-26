@@ -10,6 +10,7 @@ const router = Router({ mergeParams: true });
 // multer runs first: it parses the multipart body, so the kind/year fields only exist after it.
 router.post('/', uploadPdf, validate(uploadDocumentSchema), documents.uploadDocument);
 router.get('/', documents.listDocuments);
+router.post('/:docId/retry', documents.retryDocument);
 router.delete('/:docId', documents.deleteDocument);
 
 export default router;

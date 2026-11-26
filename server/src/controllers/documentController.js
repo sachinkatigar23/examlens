@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import mongoose from 'mongoose';
 import { Document } from '../models/Document.js';
 import { AppError, notFound } from '../utils/AppError.js';
-import { removeDocument, startIngest } from '../services/documentService.js';
+import { canRetry, removeDocument, retryDocument as retry, startIngest } from '../services/documentService.js';
 
 // The browser's mimetype can be faked, so check the file really starts with "%PDF-".
 async function looksLikePdf(filePath) {
@@ -13,6 +13,14 @@ async function looksLikePdf(filePath) {
   } finally {
     await handle.close();
   }
+}
+
+async function findDocument(req) {
+  const { docId } = req.params;
+  if (!mongoose.isValidObjectId(docId)) throw notFound('Document');
+  const document = await Document.findOne({ _id: docId, space: req.space._id });
+  if (!document) throw notFound('Document');
+  return document;
 }
 
 export async function uploadDocument(req, res) {
@@ -41,13 +49,17 @@ export async function listDocuments(req, res) {
   res.json({ documents });
 }
 
+// POST /:docId/retry — re-sends a failed (or stuck) document to the AI service.
+export async function retryDocument(req, res) {
+  const document = await findDocument(req);
+  if (!canRetry(document)) {
+    throw new AppError(409, 'NOT_RETRYABLE', 'Only failed documents can be retried');
+  }
+  await retry(document);
+  res.status(202).json({ document });
+}
+
 export async function deleteDocument(req, res) {
-  const { docId } = req.params;
-  if (!mongoose.isValidObjectId(docId)) throw notFound('Document');
-
-  const document = await Document.findOne({ _id: docId, space: req.space._id });
-  if (!document) throw notFound('Document');
-
-  await removeDocument(document);
+  await removeDocument(await findDocument(req));
   res.status(204).end();
 }
