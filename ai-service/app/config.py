@@ -16,14 +16,23 @@ class Settings(BaseSettings):
     embed_model: str = "nomic-embed-text"
     upload_dir: str = "../storage/uploads"
 
+    # Cloud mode (optional). No key -> Cloud is shown as unavailable, everything else works.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    # Optional local vision model for "Snap a doubt", e.g. qwen2.5vl:3b (slower, weaker on handwriting).
+    vision_model_local: str = ""
+
     # Retrieval / matching thresholds (cosine similarity, nomic-embed-text). Measured, see docs/BUILD_NOTES.md.
-    ask_top_k: int = 5
     ask_min_score: float = 0.55  # below this the best chunk isn't really about the question
     topic_match_min_score: float = 0.55
     # Repeats need BOTH: embedding similarity >= 0.85 and >= 60% shared content words (see services/matching.py).
     # Measured on the CN papers: half vs full duplex = 0.93 similar but 50% words; true rewordings 0.87-1.0, 100%.
     repeat_min_score: float = 0.85
     repeat_min_word_overlap: float = 0.6
+
+    # Notes chunk -> syllabus topic (to tag chunks with unit/topic). Lower than question matching: a chunk is
+    # longer and covers several ideas, so its similarity to a one-line topic is naturally lower.
+    chunk_topic_min_score: float = 0.5
 
     @property
     def upload_path(self) -> Path:

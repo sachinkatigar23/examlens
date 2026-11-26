@@ -13,7 +13,17 @@ BATCH = 32
 async def _embed(texts: list[str]) -> list[list[float]]:
     vectors: list[list[float]] = []
     for i in range(0, len(texts), BATCH):
-        data = await ollama_post("/api/embed", {"model": settings.embed_model, "input": texts[i : i + BATCH]})
+        try:
+            data = await ollama_post("/api/embed", {"model": settings.embed_model, "input": texts[i : i + BATCH]})
+        except OllamaError as exc:
+            # Searching notes always needs the local embedding model, even when answers come from Cloud.
+            if exc.code == "local_offline":
+                raise OllamaError(
+                    "Ollama is not running. ExamLens needs it to search your notes, even in Cloud mode "
+                    "(start it with `ollama serve`)",
+                    "embeddings_offline",
+                ) from exc
+            raise
         vectors.extend(data["embeddings"])
     if len(vectors) != len(texts):
         raise OllamaError("Embedding model returned the wrong number of vectors")

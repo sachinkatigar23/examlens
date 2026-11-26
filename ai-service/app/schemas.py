@@ -4,7 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-DocumentKind = Literal["notes", "syllabus", "paper"]
+DocumentKind = Literal["notes", "syllabus", "paper", "important"]
+Mode = Literal["local", "cloud"]
 
 
 class IngestRequest(BaseModel):
@@ -13,6 +14,7 @@ class IngestRequest(BaseModel):
     kind: DocumentKind
     year: int | None = None
     file_path: str  # file name inside UPLOAD_DIR
+    unit: str | None = None  # notes only: "Unit 2", or None for "Mixed / whole subject"
 
 
 class HistoryMessage(BaseModel):
@@ -22,8 +24,13 @@ class HistoryMessage(BaseModel):
 
 class AskRequest(BaseModel):
     space_id: str
-    question: str = Field(min_length=1, max_length=2000)
+    question: str = Field(min_length=1, max_length=4000)
     history: list[HistoryMessage] = []
+    mode: Mode = "local"
+    marks: int | None = Field(default=None, ge=1, le=30)  # known marks (question bank); else detected from text
+    unit: str | None = None  # prefer notes of this unit (Study follow-up chat)
+    # ask = Ask tab chat · exam = answer a stored question · doubt = solve a photographed problem
+    purpose: Literal["ask", "exam", "doubt"] = "ask"
 
 
 class RematchQuestion(BaseModel):
