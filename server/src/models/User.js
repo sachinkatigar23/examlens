@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     // Refresh tokens that are still allowed. Each refresh removes the used one (rotation);
     // presenting a token that is no longer here means it was stolen and replayed.
+    // Default chat model: 'local' (Ollama, private) or 'cloud' (Gemini). The Cloud privacy note is shown once.
+    settings: {
+      defaultMode: { type: String, enum: ['local', 'cloud'], default: 'local' },
+      cloudNoticeSeen: { type: Boolean, default: false },
+    },
     refreshTokens: {
       type: [{ jti: String, expiresAt: Date, _id: false }],
       default: [],

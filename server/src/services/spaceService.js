@@ -1,18 +1,29 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { env } from '../config/env.js';
+import { Answer } from '../models/Answer.js';
 import { Document } from '../models/Document.js';
+import { Job } from '../models/Job.js';
+import { Lesson } from '../models/Lesson.js';
 import { Message } from '../models/Message.js';
+import { Photo } from '../models/Photo.js';
 import { Question } from '../models/Question.js';
 import { Topic } from '../models/Topic.js';
 import { removeDocument } from './documentService.js';
 
 // Deleting a space deletes everything inside it.
 export async function deleteSpaceCascade(space) {
-  const documents = await Document.find({ space: space._id });
+  const spaceId = space._id;
+  await Job.updateMany({ space: spaceId, status: 'running' }, { status: 'cancelled' }); // stops "Answer all"
+  const documents = await Document.find({ space: spaceId });
   for (const doc of documents) await removeDocument(doc, { rematch: false });
-  await Promise.all([
-    Message.deleteMany({ space: space._id }),
-    Question.deleteMany({ space: space._id }),
-    Topic.deleteMany({ space: space._id }),
-  ]);
+
+  const photos = await Photo.find({ space: spaceId }).select('storedName').lean();
+  await Promise.all(photos.map((p) => fs.unlink(path.join(env.uploadDir, 'images', p.storedName)).catch(() => {})));
+
+  await Promise.all(
+    [Message, Question, Topic, Answer, Lesson, Job, Photo].map((Model) => Model.deleteMany({ space: spaceId })),
+  );
   await space.deleteOne();
 }
 

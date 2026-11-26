@@ -34,6 +34,7 @@ export async function uploadDocument(req, res) {
     owner: req.user.id,
     kind: req.body.kind,
     year: req.body.year,
+    unit: req.body.unit,
     originalName: req.file.originalname,
     storedName: req.file.filename,
     sizeBytes: req.file.size,

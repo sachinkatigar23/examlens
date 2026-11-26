@@ -1,6 +1,7 @@
 import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
+import { resumeJobs } from './services/answerJobService.js';
 
 try {
   await connectDB();
@@ -12,4 +13,6 @@ try {
 
 createApp().listen(env.port, () => {
   console.log(`ExamLens API listening on http://localhost:${env.port}/api/v1`);
+  // "Answer all" jobs that were running when the server stopped continue where they left off.
+  resumeJobs().catch((err) => console.error('Could not resume jobs', err));
 });

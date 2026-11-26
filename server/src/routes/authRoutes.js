@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { validate } from '../middleware/validate.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { loginSchema, registerSchema } from '../validators/auth.schemas.js';
+import { settingsSchema } from '../validators/settings.schemas.js';
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.post('/login', authLimiter, validate(loginSchema), auth.login);
 router.post('/refresh', auth.refresh);
 router.post('/logout', auth.logout);
 router.get('/me', requireAuth, auth.me);
+router.patch('/me/settings', requireAuth, validate(settingsSchema), auth.updateSettings);
 
 export default router;

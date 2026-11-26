@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { Document } from '../models/Document.js';
-import { Question } from '../models/Question.js';
+import { PAPERS_ONLY, Question } from '../models/Question.js';
 import { Topic } from '../models/Topic.js';
 
 const HOT_TOPICS = 5;
@@ -23,7 +23,7 @@ export async function analyseSpace(spaceIdValue) {
 
     // One row per (topic, year): how many questions and marks that topic got in that year's paper.
     Question.aggregate([
-      { $match: { space, topic: { $ne: null } } },
+      { $match: { space, ...PAPERS_ONLY, topic: { $ne: null } } },
       {
         $group: {
           _id: { topic: '$topic', year: '$year' },
@@ -35,12 +35,13 @@ export async function analyseSpace(spaceIdValue) {
 
     // Repeated questions: groups whose questions span 2+ different years.
     Question.aggregate([
-      { $match: { space, repeatGroup: { $ne: null } } },
+      { $match: { space, ...PAPERS_ONLY, repeatGroup: { $ne: null } } },
       { $sort: { year: 1 } },
       {
         $group: {
           _id: '$repeatGroup',
           text: { $first: '$text' }, // wording from the earliest paper
+          questionId: { $first: '$_id' }, // for "Answer this from my notes"
           topic: { $first: '$topic' },
           years: { $addToSet: '$year' },
         },
@@ -51,9 +52,9 @@ export async function analyseSpace(spaceIdValue) {
       { $limit: MAX_REPEATS },
     ]),
 
-    Question.countDocuments({ space, topic: null }),
-    Question.countDocuments({ space }),
-    Question.countDocuments({ space, topic: { $ne: null }, topicLocked: { $ne: true }, matchScore: { $lt: LOW_CONFIDENCE_SCORE } }),
+    Question.countDocuments({ space, ...PAPERS_ONLY, topic: null }),
+    Question.countDocuments({ space, ...PAPERS_ONLY }),
+    Question.countDocuments({ space, ...PAPERS_ONLY, topic: { $ne: null }, topicLocked: { $ne: true }, matchScore: { $lt: LOW_CONFIDENCE_SCORE } }),
   ]);
 
   const sortedYears = years.filter(Boolean).sort((a, b) => a - b);
@@ -89,6 +90,7 @@ export async function analyseSpace(spaceIdValue) {
     hotTopics,
     repeats: repeats.map((r) => ({
       group: r._id,
+      questionId: r.questionId,
       text: r.text,
       years: r.years.sort((a, b) => a - b),
       topic: r.topic ? topicName.get(r.topic.toString()) ?? null : null,

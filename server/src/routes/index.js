@@ -2,7 +2,8 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import authRoutes from './authRoutes.js';
 import spaceRoutes from './spaceRoutes.js';
-import { isAiHealthy } from '../services/aiService.js';
+import { getProviders, isAiHealthy } from '../services/aiService.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 
 const router = Router();
 
@@ -11,6 +12,11 @@ router.get('/health', async (_req, res) => {
   const mongoOk = mongoose.connection.readyState === 1;
   const ai = await isAiHealthy();
   res.status(mongoOk ? 200 : 503).json({ status: mongoOk ? 'ok' : 'degraded', mongo: mongoOk, ai });
+});
+
+// What the Local / Cloud toggle can offer right now (Cloud needs GEMINI_API_KEY in the AI service).
+router.get('/ai/providers', requireAuth, async (_req, res) => {
+  res.json(await getProviders());
 });
 
 router.use('/auth', authRoutes);

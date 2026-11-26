@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Question } from '../models/Question.js';
+import { PAPERS_ONLY, Question } from '../models/Question.js';
 import { Topic } from '../models/Topic.js';
 import { LOW_CONFIDENCE_SCORE, analyseSpace, isLowConfidence } from '../services/analysisService.js';
 import { AppError, notFound } from '../utils/AppError.js';
@@ -12,7 +12,7 @@ export async function getAnalysis(req, res) {
 // The questions behind one heatmap cell, the unmatched ones, or the low-confidence matches to review.
 export async function listQuestions(req, res) {
   const { topic, year, confidence } = req.query;
-  const filter = { space: req.space._id };
+  const filter = { space: req.space._id, ...PAPERS_ONLY };
 
   if (topic === 'none') filter.topic = null;
   else if (topic) {

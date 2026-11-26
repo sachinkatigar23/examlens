@@ -86,3 +86,11 @@ export async function me(req, res) {
   if (!user) throw new AppError(401, 'UNAUTHORIZED', 'Please log in');
   res.json({ user });
 }
+
+// PATCH /auth/me/settings { defaultMode?, cloudNoticeSeen? }
+export async function updateSettings(req, res) {
+  const changes = Object.fromEntries(Object.entries(req.body).map(([key, value]) => [`settings.${key}`, value]));
+  const user = await User.findByIdAndUpdate(req.user.id, { $set: changes }, { returnDocument: 'after' });
+  if (!user) throw new AppError(401, 'UNAUTHORIZED', 'Please log in');
+  res.json({ user });
+}

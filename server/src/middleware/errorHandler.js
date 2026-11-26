@@ -30,7 +30,8 @@ function toResponse(err) {
   }
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return { status: 413, body: { code: 'FILE_TOO_LARGE', message: 'PDF must be 20 MB or smaller' } };
+      const message = err.field === 'image' ? 'Photo must be 10 MB or smaller' : 'PDF must be 20 MB or smaller';
+      return { status: 413, body: { code: 'FILE_TOO_LARGE', message } };
     }
     return { status: 400, body: { code: 'UPLOAD_ERROR', message: err.message } };
   }

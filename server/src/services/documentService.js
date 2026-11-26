@@ -2,10 +2,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../config/env.js';
 import { Document } from '../models/Document.js';
-import { Question } from '../models/Question.js';
-import { Topic } from '../models/Topic.js';
 import { deleteDocumentVectors, requestIngest } from './aiService.js';
-import { rematchSpaceInBackground } from './topicMatchService.js';
+import { removeQuestions, removeTopics } from './ingestResultService.js';
+import { topicsChangedInBackground } from './topicMatchService.js';
 
 // A document stuck in queued/processing this long (e.g. the AI service restarted) may be retried.
 export const STALE_AFTER_MS = 10 * 60 * 1000;
@@ -22,23 +21,16 @@ export async function startIngest(document) {
   }
 }
 
-// Removes what earlier processing produced for this document (topics/questions in MongoDB).
-// Returns true if it removed syllabus topics, i.e. questions need re-matching.
+// Removes what earlier processing produced for this document (topics, questions, their lessons/answers).
+// Returns true if it removed topics, i.e. questions need re-matching and notes re-tagging.
 async function clearResults(document) {
-  const topics = await Topic.find({ document: document._id }).select('_id').lean();
-  await Question.deleteMany({ document: document._id });
-  await Topic.deleteMany({ document: document._id });
-  if (!topics.length) return false;
-  await Question.updateMany(
-    { space: document.space, topic: { $in: topics.map((t) => t._id) } },
-    { topic: null, matchScore: null, topicLocked: false }, // their topic is gone, even if placed by hand
-  );
-  return true;
+  await removeQuestions({ document: document._id });
+  return (await removeTopics({ document: document._id })) > 0;
 }
 
 export async function retryDocument(document) {
   const hadTopics = await clearResults(document);
-  if (hadTopics) rematchSpaceInBackground(document.space);
+  if (hadTopics) topicsChangedInBackground(document.space);
   document.set({ status: 'queued', error: null, pages: null, chunkCount: 0 });
   await document.save();
   await startIngest(document);
@@ -59,5 +51,5 @@ export async function removeDocument(document, { rematch = true } = {}) {
   await fs.unlink(path.join(env.uploadDir, document.storedName)).catch(() => {});
   await Document.deleteOne({ _id: document._id });
   // Questions that pointed at the deleted syllabus may fit another syllabus still in the space.
-  if (hadTopics && rematch) rematchSpaceInBackground(document.space);
+  if (hadTopics && rematch) topicsChangedInBackground(document.space);
 }
