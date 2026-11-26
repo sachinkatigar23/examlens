@@ -7,11 +7,13 @@ const BATCH = 200;
 // Re-links every question in the space to its closest current topic. Needed when the syllabus arrives
 // after the papers, or when a syllabus is deleted/replaced.
 export async function rematchSpace(spaceId) {
-  const questions = await Question.find({ space: spaceId }).select('text').lean();
+  // Questions the student placed by hand keep their topic.
+  const auto = { space: spaceId, topicLocked: { $ne: true } };
+  const questions = await Question.find(auto).select('text').lean();
   if (!questions.length) return;
 
   if (!(await Topic.exists({ space: spaceId }))) {
-    await Question.updateMany({ space: spaceId }, { topic: null, matchScore: null });
+    await Question.updateMany(auto, { topic: null, matchScore: null });
     return;
   }
 

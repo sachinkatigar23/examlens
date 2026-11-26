@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import FormError from './FormError.jsx';
 import Heatmap from './Heatmap.jsx';
@@ -12,9 +12,14 @@ export default function AnalyzerTab({ spaceId }) {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null); // { topic, year, label }
 
+  // Also called after a question is moved to another topic, so the heatmap counts follow.
+  const load = useCallback(
+    () => getAnalysis(spaceId).then(setData).catch((err) => setError(errorMessage(err))),
+    [spaceId],
+  );
   useEffect(() => {
-    getAnalysis(spaceId).then(setData).catch((err) => setError(errorMessage(err)));
-  }, [spaceId]);
+    load();
+  }, [load]);
 
   if (error) return <FormError message={error} />;
   if (!data) return <p className="font-mono text-sm text-ink-muted" role="status">Counting questions…</p>;
@@ -60,19 +65,38 @@ export default function AnalyzerTab({ spaceId }) {
             selected={selected}
             onSelect={(cell) => setSelected(cell)}
           />
-          {data.unmatched > 0 && (
-            <button
-              onClick={() => setSelected({ topic: 'none', label: 'Questions not matched to a topic' })}
-              className="mt-3 text-sm text-ink-muted underline decoration-rule decoration-2 underline-offset-4 hover:text-ink"
-            >
-              {plural(data.unmatched, 'question')} didn't match any syllabus topic. See them
-            </button>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
+            {data.lowConfidence > 0 && (
+              <button
+                onClick={() => setSelected({ confidence: 'low', label: 'Low-confidence matches' })}
+                className="text-sm text-pen underline decoration-pen/40 decoration-2 underline-offset-4 hover:decoration-pen"
+              >
+                {plural(data.lowConfidence, 'match', 'matches')} {data.lowConfidence === 1 ? 'is' : 'are'} low confidence. Review
+              </button>
+            )}
+            {data.unmatched > 0 && (
+              <button
+                onClick={() => setSelected({ topic: 'none', label: 'Questions not matched to a topic' })}
+                className="text-sm text-ink-muted underline decoration-rule decoration-2 underline-offset-4 hover:text-ink"
+              >
+                {plural(data.unmatched, 'question')} didn't match any syllabus topic. See them
+              </button>
+            )}
+          </div>
+          {selected && (
+            <QuestionPanel
+              key={JSON.stringify(selected)}
+              spaceId={spaceId}
+              selection={selected}
+              topics={data.topics}
+              onMoved={load}
+              onClose={() => setSelected(null)}
+            />
           )}
-          {selected && <QuestionPanel spaceId={spaceId} selection={selected} onClose={() => setSelected(null)} />}
         </section>
       )}
 
-      <div className="grid gap-12 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         {data.hotTopics.length > 0 && <HotTopics topics={data.hotTopics} paperCount={data.paperCount} />}
         <Repeats repeats={data.repeats} />
       </div>
@@ -123,6 +147,9 @@ function HotTopics({ topics, paperCount }) {
             <PenCircle n={i + 1} />
             <div className="min-w-0">
               <p className="font-serif text-lg leading-snug font-medium">{t.name}</p>
+              {t.details && t.details !== t.name && (
+                <p className="truncate text-sm text-ink-muted" title={t.details}>{t.details}</p>
+              )}
               <p className="font-mono text-xs text-ink-muted">
                 {t.unit} · in {t.yearsAsked} of {paperCount} papers · {plural(t.total, 'question')}
                 {t.marks > 0 && ` · ${t.marks} marks`}

@@ -6,11 +6,17 @@ import { Topic } from '../models/Topic.js';
 const HOT_TOPICS = 5;
 const MAX_REPEATS = 20;
 
+// A topic match below this similarity is shown as "low confidence" so the student can check it.
+// Measured on real CN papers: the wrong matches scored 0.59-0.64, correct ones mostly 0.65-0.89.
+export const LOW_CONFIDENCE_SCORE = 0.65;
+export const isLowConfidence = (q) =>
+  Boolean(q.topic) && !q.topicLocked && q.matchScore != null && q.matchScore < LOW_CONFIDENCE_SCORE;
+
 // Everything the Analyzer tab shows, computed with MongoDB aggregations.
 export async function analyseSpace(spaceIdValue) {
   const space = new mongoose.Types.ObjectId(String(spaceIdValue));
 
-  const [years, topics, cells, repeats, unmatched, questionCount] = await Promise.all([
+  const [years, topics, cells, repeats, unmatched, questionCount, lowConfidence] = await Promise.all([
     // Years = papers that finished processing (a paper with 0 matched questions still counts as a year).
     Document.distinct('year', { space, kind: 'paper', status: 'ready' }),
     Topic.find({ space }).sort({ order: 1 }).lean(),
@@ -47,6 +53,7 @@ export async function analyseSpace(spaceIdValue) {
 
     Question.countDocuments({ space, topic: null }),
     Question.countDocuments({ space }),
+    Question.countDocuments({ space, topic: { $ne: null }, topicLocked: { $ne: true }, matchScore: { $lt: LOW_CONFIDENCE_SCORE } }),
   ]);
 
   const sortedYears = years.filter(Boolean).sort((a, b) => a - b);
@@ -59,6 +66,7 @@ export async function analyseSpace(spaceIdValue) {
       topicId: t._id,
       unit: t.unit,
       name: t.name,
+      details: t.details, // sub-topics from the syllabus, e.g. "OSI reference model and its layers, TCP/IP model"
       total: mine.reduce((sum, c) => sum + c.count, 0),
       marks: mine.reduce((sum, c) => sum + c.marks, 0),
       yearsAsked: mine.length, // in how many different papers it appeared
@@ -66,10 +74,11 @@ export async function analyseSpace(spaceIdValue) {
     };
   });
 
-  // "Hot" = asked in the most different years; ties broken by how many questions.
+  // "Hot" = asked in the most different years; ties broken by marks (a 16-mark question every year beats
+  // several 2-mark one-liners), then by number of questions.
   const hotTopics = rows
     .filter((r) => r.total > 0)
-    .sort((a, b) => b.yearsAsked - a.yearsAsked || b.total - a.total)
+    .sort((a, b) => b.yearsAsked - a.yearsAsked || b.marks - a.marks || b.total - a.total)
     .slice(0, HOT_TOPICS);
 
   return {
@@ -85,5 +94,6 @@ export async function analyseSpace(spaceIdValue) {
       topic: r.topic ? topicName.get(r.topic.toString()) ?? null : null,
     })),
     unmatched,
+    lowConfidence,
   };
 }

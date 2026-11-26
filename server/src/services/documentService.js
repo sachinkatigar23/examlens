@@ -31,7 +31,7 @@ async function clearResults(document) {
   if (!topics.length) return false;
   await Question.updateMany(
     { space: document.space, topic: { $in: topics.map((t) => t._id) } },
-    { topic: null, matchScore: null },
+    { topic: null, matchScore: null, topicLocked: false }, // their topic is gone, even if placed by hand
   );
   return true;
 }

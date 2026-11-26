@@ -8,6 +8,7 @@ import { validate } from '../middleware/validate.js';
 import { askLimiter } from '../middleware/rateLimit.js';
 import { createSpaceSchema, updateSpaceSchema } from '../validators/space.schemas.js';
 import { askSchema } from '../validators/ask.schemas.js';
+import { moveQuestionSchema } from '../validators/question.schemas.js';
 import documentRoutes from './documentRoutes.js';
 
 const router = Router();
@@ -31,5 +32,6 @@ router.delete('/:spaceId/messages', requireSpaceOwner, askCtrl.clearMessages);
 // Analyzer
 router.get('/:spaceId/analysis', requireSpaceOwner, analysis.getAnalysis);
 router.get('/:spaceId/questions', requireSpaceOwner, analysis.listQuestions);
+router.patch('/:spaceId/questions/:questionId', requireSpaceOwner, validate(moveQuestionSchema), analysis.moveQuestion);
 
 export default router;

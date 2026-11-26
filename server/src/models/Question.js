@@ -12,6 +12,8 @@ const questionSchema = new mongoose.Schema(
     marks: { type: Number, default: null },
     topic: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic', default: null },
     matchScore: { type: Number, default: null },
+    // true once the student moved the question to a topic by hand: automatic re-matching leaves it alone.
+    topicLocked: { type: Boolean, default: false },
     // Same value = the same question asked in different years. A question that was never repeated
     // has a group of its own (its own id), so only groups spanning 2+ years count as repeats.
     repeatGroup: { type: String, default: null },

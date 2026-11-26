@@ -7,4 +7,4 @@ export function formatBytes(bytes) {
 const dateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
 export const formatDate = (iso) => dateFormat.format(new Date(iso));
 
-export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+export const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
