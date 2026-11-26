@@ -23,3 +23,6 @@ storage/uploads/*
 Thumbs.db
 *.log
 .vscode/
+
+# your own test PDFs (syllabus, notes, past papers)
+samples/

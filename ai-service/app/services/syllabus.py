@@ -1,0 +1,77 @@
+"""Syllabus -> topics grouped by unit, using the LLM one unit at a time."""
+
+import re
+
+from app.schemas import ExtractedTopics
+from app.services.llm import chat_json
+from app.services.pdf import Page
+
+UNIT_HEADING = re.compile(r"^\s*(unit|module)\s*[-–:.]?\s*([ivx]+|\d{1,2})\b[\s\-–:.]*(.*)$", re.IGNORECASE)
+# Stop reading at the book list / outcomes: they mention topics but aren't syllabus content.
+END_OF_UNITS = re.compile(r"^\s*(text\s*books?|reference(s| books?)?|course outcomes?|suggested readings?)\b", re.I)
+ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8, "ix": 9, "x": 10}
+
+SYSTEM = """You turn one unit of a university syllabus into a list of exam topics.
+The unit text is usually a title followed by sub-topics separated by commas.
+Group closely related sub-topics into topics. Aim for 4 to 8 topics per unit; never return just one.
+For each topic:
+- name: 2 to 5 words, the way a student would say it (e.g. "Relational algebra", "Normal forms").
+- details: the original sub-topics it covers, comma separated, copied from the text.
+Every sub-topic in the text must appear in exactly one topic's details.
+Ignore objectives, hours, text books and references."""
+
+
+def _unit_label(kind: str, number: str) -> str:
+    n = ROMAN.get(number.lower(), number)
+    return f"{kind.capitalize()} {n}"
+
+
+def split_units(pages: list[Page]) -> list[tuple[str, str]]:
+    """[(unit label, text)] when the syllabus has "Unit 1 / UNIT-II / Module 3" headings, else []."""
+    units: list[tuple[str, list[str]]] = []
+    for line in (l for p in pages for l in p.text.splitlines()):
+        heading = UNIT_HEADING.match(line)
+        if heading:
+            units.append((_unit_label(heading.group(1), heading.group(2)), [heading.group(3)]))
+        elif units and END_OF_UNITS.match(line):
+            break
+        elif units:
+            units[-1][1].append(line)
+    return [(label, "\n".join(lines).strip()) for label, lines in units if "".join(lines).strip()]
+
+
+async def extract_topics(pages: list[Page]) -> list[dict]:
+    """Returns [{unit, name, details}] in syllabus order."""
+    topics: list[dict] = []
+    units = split_units(pages)
+    if len(units) >= 2:
+        for label, text in units:
+            result = await chat_json(SYSTEM, f"This is {label} of the syllabus:\n\n{text[:5000]}", ExtractedTopics)
+            topics.extend({"unit": label, "name": t.name.strip(), "details": t.details.strip()} for t in result.topics)
+    else:
+        # No clear unit headings: let the model infer units from the whole text, a few pages at a time.
+        text = "\n".join(p.text for p in pages)
+        for i in range(0, len(text), 4000):
+            result = await chat_json(
+                SYSTEM + "\n- unit: the unit/module the topic belongs to, like \"Unit 2\".",
+                f"Syllabus text:\n\n{text[i : i + 4000]}",
+                ExtractedTopics,
+            )
+            topics.extend(
+                {"unit": t.unit.strip() or "General", "name": t.name.strip(), "details": t.details.strip()}
+                for t in result.topics
+            )
+
+    # Drop duplicates the model sometimes repeats.
+    seen, unique = set(), []
+    for t in topics:
+        key = (t["unit"].lower(), t["name"].lower())
+        if t["name"] and key not in seen:
+            seen.add(key)
+            unique.append(t)
+    return unique
+
+
+def topic_embedding_text(topic: dict) -> str:
+    # Name plus its sub-topics: "Normalization: 1NF, 2NF, BCNF" matches questions far better than the name alone.
+    return f"{topic['name']}: {topic['details']}" if topic.get("details") else topic["name"]
