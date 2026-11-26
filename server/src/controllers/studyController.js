@@ -39,11 +39,10 @@ export async function getStudyPlan(req, res) {
   res.json({ units, mixedNotes: notes.filter((n) => !n.unit).length });
 }
 
-// GET /spaces/:spaceId/topics/:topicId/lesson — the cached lesson, or 404.
+// GET /spaces/:spaceId/topics/:topicId/lesson — the cached lesson, or { lesson: null } if not written yet.
 export async function getLesson(req, res) {
   const topic = await findTopic(req);
   const lesson = await Lesson.findOne({ space: req.space._id, topic: topic._id }).lean();
-  if (!lesson) throw notFound('Lesson');
   res.json({ lesson });
 }
 

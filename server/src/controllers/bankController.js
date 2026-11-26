@@ -66,11 +66,10 @@ export async function setMarks(req, res) {
   res.json({ question });
 }
 
-// GET /spaces/:spaceId/questions/:questionId/answer — the cached answer, or 404 if none yet.
+// GET /spaces/:spaceId/questions/:questionId/answer — the cached answer, or { answer: null } if none yet.
 export async function getAnswer(req, res) {
   const question = await findQuestion(req);
   const answer = await Answer.findOne({ question: question._id }).lean();
-  if (!answer) throw notFound('Answer');
   res.json({ answer });
 }
 

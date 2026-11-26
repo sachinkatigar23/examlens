@@ -100,9 +100,10 @@ export async function startAnswerAll(space, user, { mode, unit }) {
   if (await Job.exists({ space: space._id, type: 'answer-all', status: 'running' })) {
     throw new AppError(409, 'JOB_RUNNING', 'Answer all is already running for this notebook');
   }
-  const total = await Question.countDocuments(bankScope(space._id, unit));
+  const { total, pending } = await pendingQuestions({ space: space._id, unit });
   if (!total) throw new AppError(400, 'NO_QUESTIONS', 'There are no question-bank questions to answer yet');
-  const job = await Job.create({ space: space._id, user, type: 'answer-all', mode, unit, total });
+  // Progress starts at what is already answered, so the UI never shows "1 of 22" while resuming.
+  const job = await Job.create({ space: space._id, user, type: 'answer-all', mode, unit, total, done: total - pending.length });
   enqueue(job._id);
   return job;
 }

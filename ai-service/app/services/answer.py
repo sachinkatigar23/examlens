@@ -15,6 +15,9 @@ NOT_FOUND = (
 )
 DEFAULT_MARKS = 5
 HISTORY_TURNS = 4
+FOLLOW_UP_WORDS = 8
+# "explain it more simply", "give another example", "what about the second one?"
+FOLLOW_UP = re.compile(r"\b(it|its|this|that|these|those|them|more|again|simpler|simply|another|above|previous|one)\b", re.I)
 
 # Longer answers need more material: marks -> how many note excerpts to retrieve.
 TOP_K = {2: 4, 5: 6, 10: 10, 16: 12}
@@ -62,9 +65,11 @@ MAX_TOKENS = {2: 250, 5: 600, 10: 1300, 16: 1900}
 SYSTEM = """You are ExamLens, a tutor helping a university student write exam answers from their OWN notes.
 Rules:
 1. Use only facts found in the note excerpts. Do not add facts the notes don't support.
+   If the question asks for a program, write it (in the language asked) following the method in the notes.
 2. After each fact, cite the page it came from exactly like this: [p. 12]
 3. Answer only what the question asks. Ignore excerpts about other topics.
-4. If the excerpts don't contain the answer, reply only: "I couldn't find this in your notes."
+4. If the excerpts don't cover the topic at all, reply only: "I couldn't find this in your notes."
+   (A program for an algorithm the notes explain IS covered: write it.)
 5. Write in Markdown. Never put a citation inside a code block."""
 
 ANSWER_REQUEST = """Question ({marks} marks): {query}
@@ -75,6 +80,10 @@ Structure, in this order:
 {shape}
 
 Cite the page after facts like [p. 12]."""
+# (A refusal reminder at the END of this request made qwen2.5:3b refuse 7 of 9 on-topic questions: the last
+# line wins. Refusals are handled by the system rule + cutting the stream after a refusal line, below.)
+
+REFUSAL = "i couldn't find this in your notes"
 
 DOUBT_SYSTEM = """You are ExamLens, a tutor. The student photographed a problem or a piece of code they are stuck on.
 1. Solve it step by step, numbering the steps. Follow the method, notation and terms used in the note
@@ -83,6 +92,21 @@ DOUBT_SYSTEM = """You are ExamLens, a tutor. The student photographed a problem 
 3. If the notes don't cover the method, start with "Your notes don't cover this; using a general method:"
    and solve it anyway.
 4. End with the final answer in bold. Write in Markdown."""
+
+# "Write a python program on BFS", "Implement A* in Java", "code for DFS". A program is never IN the notes
+# word for word, so with the normal rules a small model refused 3 of 4 such questions ("couldn't find this").
+PROGRAM = re.compile(r"\b(program|programme|code|implement(ation)?|source)\b", re.I)
+LANGUAGE = re.compile(r"\b(python|java|kotlin|c\+\+|c#|javascript|js|c|sql)\b", re.I)
+
+PROGRAM_SYSTEM = """You are ExamLens, a tutor helping a university student answer a programming question for an exam.
+1. Find the algorithm or concept in the note excerpts and follow the steps they describe.
+2. Write a complete, correct, runnable program in a fenced code block with its language, with short comments.
+3. After the code, explain how it works in 3 to 5 bullets, citing the notes like this: [p. 12]
+4. If the excerpts don't describe the algorithm, start with "Your notes don't describe this algorithm; a standard
+   version:" and still write the program.
+Write in Markdown. Never put a citation inside the code block."""
+# No "reply only: I couldn't find this" rule here: with it, qwen2.5:3b refused 1 in 3 program questions whose
+# algorithm IS in the notes. Off-topic questions are still stopped earlier by the retrieval score guard.
 
 MARKS_IN_TEXT = re.compile(r"(?:for\s+(?:an?\s+)?|\(\s*)?\b(\d{1,2})\s*[- ]?\s*marks?\b(?:\s*answer)?\s*\)?", re.I)
 
@@ -115,6 +139,10 @@ def detect_marks(question: str) -> tuple[int | None, str]:
     return int(m.group(1)), cleaned or question
 
 
+def is_follow_up(question: str) -> bool:
+    return len(question.split()) <= FOLLOW_UP_WORDS and bool(FOLLOW_UP.search(question))
+
+
 def small_talk_reply(question: str) -> str | None:
     if not SMALL_TALK.match(question):
         return None
@@ -132,13 +160,24 @@ def _messages(req: AskRequest, hits, marks: int, query: str) -> list[dict]:
             {"role": "system", "content": DOUBT_SYSTEM},
             {"role": "user", "content": f"Note excerpts:\n\n{context}\n\n---\nThe problem:\n{req.question}"},
         ]
+    # Chat history only for short follow-ups ("explain it more simply"). For a full question it hurts: earlier
+    # one-paragraph answers taught the model to ignore the 10-mark structure (measured in the Ask tab).
     history = []
-    if req.purpose == "ask":
+    if req.purpose == "ask" and is_follow_up(query):
         history = [{"role": m.role, "content": m.content[:1500]} for m in req.history[-HISTORY_TURNS:]]
+    if PROGRAM.search(query):
+        language = (LANGUAGE.search(query) or ["Python"])[0]
+        return [
+            {"role": "system", "content": PROGRAM_SYSTEM},
+            *history,
+            {"role": "user", "content": f"Note excerpts:\n\n{context}\n\n---\nQuestion ({marks} marks): {query}\n"
+                                        f"Write the program in {language}, then explain it with page citations."},
+        ]
     return [
-        {"role": "system", "content": SYSTEM.format(format=FORMATS[marks])},
+        {"role": "system", "content": SYSTEM},
         *history,
-        {"role": "user", "content": f"Note excerpts:\n\n{context}\n\n---\nQuestion ({marks} marks): {query}"},
+        {"role": "user", "content": f"Note excerpts:\n\n{context}\n\n---\n"
+                                    + ANSWER_REQUEST.format(marks=marks, query=query, **FORMATS[marks])},
     ]
 
 
@@ -169,10 +208,19 @@ async def answer_stream(req: AskRequest) -> AsyncIterator[str]:
         hits = [h for h in hits if h.score >= settings.ask_min_score - 0.1]
         answer = ""
         async for token in provider.stream_chat(_messages(req, hits, marks, query), max_tokens=MAX_TOKENS[marks]):
+            head = (answer + token).lstrip()
+            # A small model sometimes refuses and then fills the answer shape anyway, with invented facts and
+            # page numbers. Once a refusal line is complete, nothing after it is sent.
+            if head.lower().startswith(REFUSAL) and "\n" in head:
+                rest = head.split("\n", 1)[0][len(answer.lstrip()) :]
+                if rest:
+                    yield sse("token", {"text": rest})
+                answer = head.split("\n", 1)[0]
+                break
             answer += token
             yield sse("token", {"text": token})
 
-        grounded = "couldn't find this in your notes" not in answer.lower()
+        grounded = REFUSAL not in answer.lower()
         yield sse("done", {"citations": citations(hits, answer) if grounded else [], "grounded": grounded, **meta})
     except LLMError as exc:
         yield sse("error", {"message": str(exc), "code": exc.code})

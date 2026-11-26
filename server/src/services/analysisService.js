@@ -42,6 +42,7 @@ export async function analyseSpace(spaceIdValue) {
           _id: '$repeatGroup',
           text: { $first: '$text' }, // wording from the earliest paper
           questionId: { $first: '$_id' }, // for "Answer this from my notes"
+          marks: { $max: '$marks' },
           topic: { $first: '$topic' },
           years: { $addToSet: '$year' },
         },
@@ -91,6 +92,7 @@ export async function analyseSpace(spaceIdValue) {
     repeats: repeats.map((r) => ({
       group: r._id,
       questionId: r.questionId,
+      marks: r.marks,
       text: r.text,
       years: r.years.sort((a, b) => a - b),
       topic: r.topic ? topicName.get(r.topic.toString()) ?? null : null,
