@@ -1,0 +1,25 @@
+# deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# build
+dist/
+build/
+
+# uploads
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
