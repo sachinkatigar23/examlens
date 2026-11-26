@@ -11,12 +11,14 @@ from app.schemas import IngestRequest
 from app.services import qdrant
 from app.services.chunking import chunk_pages
 from app.services.embeddings import embed_documents
-from app.services.llm import OllamaError
+from app.services.important import derive_topics, extract_important
+from app.services.llm import LLMError
 from app.services.matching import find_repeat_group, match_topics
 from app.services.node_client import update_document
 from app.services.pdf import Page, ScannedPdfError, extract_pages
 from app.services.questions import extract_questions
 from app.services.syllabus import extract_topics, topic_embedding_text
+from app.services.units import tag_chunks
 
 log = logging.getLogger("examlens.ingest")
 
@@ -45,27 +47,66 @@ async def _ingest_chunks(req: IngestRequest, pages: list[Page]) -> int:
     if not chunks:
         return 0
     vectors = await embed_documents([c.text for c in chunks])
+    # Notes are tagged with their unit + nearest syllabus topic (Study mode retrieves by these).
+    tags = await tag_chunks(req.space_id, vectors, req.unit) if req.kind == "notes" else [(None, None)] * len(chunks)
     payloads = [
-        {"space_id": req.space_id, "document_id": req.document_id, "page": c.page, "kind": req.kind, "text": c.text}
-        for c in chunks
+        {"space_id": req.space_id, "document_id": req.document_id, "page": c.page, "kind": req.kind, "text": c.text,
+         "unit": unit, "topic_id": topic_id}
+        for c, (unit, topic_id) in zip(chunks, tags, strict=True)
     ]
     await qdrant.upsert(qdrant.CHUNKS, vectors, payloads)
     return len(chunks)
+
+
+async def _save_topics(req: IngestRequest, topics: list[dict]) -> list[dict]:
+    for order, t in enumerate(topics):
+        t["id"], t["order"] = new_object_id(), order
+    vectors = await embed_documents([topic_embedding_text(t) for t in topics])
+    payloads = [
+        {"space_id": req.space_id, "document_id": req.document_id, "topic_id": t["id"], "unit": t["unit"],
+         "name": t["name"], "derived": t.get("derived", False)}
+        for t in topics
+    ]
+    await qdrant.upsert(qdrant.TOPICS, vectors, payloads)
+    return topics
 
 
 async def _ingest_topics(req: IngestRequest, pages: list[Page]) -> list[dict]:
     topics = await extract_topics(pages)
     if not topics:
         raise ValueError("Couldn't find any units or topics in this syllabus")
-    for order, t in enumerate(topics):
-        t["id"], t["order"] = new_object_id(), order
-    vectors = await embed_documents([topic_embedding_text(t) for t in topics])
+    # A real syllabus replaces topics that were only derived from a question bank.
+    await qdrant.delete_where(qdrant.TOPICS, req.space_id, [qdrant.field_is("derived", True)])
+    return await _save_topics(req, topics)
+
+
+async def _ingest_important(req: IngestRequest, pages: list[Page]) -> tuple[list[dict], list[dict]]:
+    """College question bank -> (questions, derived topics). Topics are derived only when the notebook has none."""
+    questions, method = await extract_important(pages)
+    log.info("question bank %s: %s questions via %s", req.document_id, len(questions), method)
+    if not questions:
+        raise ValueError("Couldn't find any questions in this PDF")
+
+    topics = []
+    if await qdrant.count(qdrant.TOPICS, req.space_id) == 0:
+        topics = await _save_topics(req, await derive_topics(questions))
+        log.info("no syllabus: derived %s topics from the question bank", len(topics))
+
+    matches = await match_topics(req.space_id, [q["text"] for q in questions], [q["unit"] for q in questions])
+    vectors = await embed_documents([q["text"] for q in questions])
+    for q, (topic_id, score), vector in zip(questions, matches, vectors, strict=True):
+        q["id"], q["topic_id"], q["match_score"] = new_object_id(), topic_id, score
+        # Year 0 = not a dated paper. A paper question that matches it (now or when uploaded later) shares the
+        # group, which gives the "also asked in 2023, 2025" badge.
+        q["repeat_group"] = await find_repeat_group(req.space_id, q["text"], vector, 0, req.document_id) or q["id"]
+
     payloads = [
-        {"space_id": req.space_id, "document_id": req.document_id, "topic_id": t["id"], "unit": t["unit"], "name": t["name"]}
-        for t in topics
+        {"space_id": req.space_id, "document_id": req.document_id, "question_id": q["id"], "year": 0,
+         "kind": "important", "repeat_group": q["repeat_group"], "text": q["text"]}
+        for q in questions
     ]
-    await qdrant.upsert(qdrant.TOPICS, vectors, payloads)
-    return topics
+    await qdrant.upsert(qdrant.QUESTIONS, vectors, payloads)
+    return questions, topics
 
 
 async def _ingest_questions(req: IngestRequest, pages: list[Page]) -> list[dict]:
@@ -109,7 +150,9 @@ async def run_ingest(req: IngestRequest) -> None:
                 result["topics"] = await _ingest_topics(req, pages)
             if req.kind == "paper":
                 result["questions"] = await _ingest_questions(req, pages)
-        except (ScannedPdfError, OllamaError, ValueError, FileNotFoundError) as exc:
+            if req.kind == "important":
+                result["questions"], result["topics"] = await _ingest_important(req, pages)
+        except (ScannedPdfError, LLMError, ValueError, FileNotFoundError) as exc:
             result = {"status": "failed", "error": str(exc)}
         except Exception as exc:  # anything unexpected: still tell Node, never leave the doc "processing"
             log.exception("ingest crashed for %s", req.document_id)

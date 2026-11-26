@@ -29,13 +29,14 @@ class AskRequest(BaseModel):
     mode: Mode = "local"
     marks: int | None = Field(default=None, ge=1, le=30)  # known marks (question bank); else detected from text
     unit: str | None = None  # prefer notes of this unit (Study follow-up chat)
-    # ask = Ask tab chat · exam = answer a stored question · doubt = solve a photographed problem
+    # ask = Ask tab chat Â· exam = answer a stored question Â· doubt = solve a photographed problem
     purpose: Literal["ask", "exam", "doubt"] = "ask"
 
 
 class RematchQuestion(BaseModel):
     id: str
     text: str
+    unit: str | None = None  # question bank questions: match within their unit first
 
 
 class RematchRequest(BaseModel):
@@ -53,7 +54,7 @@ class TopicMatch(BaseModel):
 
 
 class ExtractedTopic(BaseModel):
-    unit: str
+    unit: str = ""
     name: str
     details: str = ""
 
@@ -70,3 +71,27 @@ class ExtractedQuestion(BaseModel):
 
 class ExtractedQuestions(BaseModel):
     questions: list[ExtractedQuestion]
+
+
+class LessonRequest(BaseModel):
+    space_id: str
+    topic_id: str | None = None  # None for topics derived from a question bank: their chunk tags are rough
+    unit: str | None = None
+    name: str = Field(min_length=1, max_length=200)
+    details: str = Field(default="", max_length=2000)
+    mode: Mode = "local"
+
+
+class TranscribeRequest(BaseModel):
+    file_path: str  # "images/<uuid>.jpg", relative to UPLOAD_DIR
+    mode: Mode = "local"
+
+
+class RetagDocument(BaseModel):
+    document_id: str
+    unit: str | None = None
+
+
+class RetagRequest(BaseModel):
+    space_id: str
+    documents: list[RetagDocument]

@@ -52,7 +52,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self, model: str | None = None):
         self.model = model or settings.chat_model
 
-    async def chat_json(self, system: str, user: str, schema: type[T]) -> T:
+    async def chat_json(self, system: str, user: str, schema: type[T], max_tokens: int | None = None) -> T:
         """Ollama constrains the output to the JSON schema; pydantic validates. Retries once on invalid output
         (small models occasionally truncate or drift)."""
         body = {
@@ -60,7 +60,8 @@ class OllamaProvider(LLMProvider):
             "stream": False,
             "format": schema.model_json_schema(),
             # Extraction (syllabus topics, questions) must be repeatable: temperature 0 + a fixed seed.
-            "options": {"temperature": 0, "seed": 42, "num_ctx": EXTRACT_CONTEXT},
+            "options": {"temperature": 0, "seed": 42, "num_ctx": EXTRACT_CONTEXT,
+                        **({"num_predict": max_tokens} if max_tokens else {})},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
         last_error: Exception | None = None
@@ -124,8 +125,8 @@ class OllamaProvider(LLMProvider):
 _default = OllamaProvider()
 
 
-async def chat_json(system: str, user: str, schema: type[T]) -> T:
-    return await _default.chat_json(system, user, schema)
+async def chat_json(system: str, user: str, schema: type[T], max_tokens: int | None = None) -> T:
+    return await _default.chat_json(system, user, schema, max_tokens)
 
 
 async def installed_models() -> set[str] | None:

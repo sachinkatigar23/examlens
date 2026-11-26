@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.routers import ask, documents, health, ingest, rematch
+from app.routers import ask, documents, health, ingest, rematch, study
 from app.services import qdrant
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -26,5 +26,5 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="ExamLens AI service", lifespan=lifespan)
 
-for module in (health, ingest, ask, rematch, documents):
+for module in (health, ingest, ask, rematch, documents, study):
     app.include_router(module.router)

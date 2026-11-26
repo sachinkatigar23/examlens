@@ -68,6 +68,13 @@ def parse_labelled_topics(unit_text: str) -> list[dict] | None:
     return topics if labelled >= 2 else None
 
 
+def unit_title(unit_text: str) -> str:
+    """First line of a unit ("Introduction to Data Communication (12 Hours)") without the hours, if it looks
+    like a title rather than a list of topics."""
+    first = HOURS.sub("", unit_text.strip().splitlines()[0] if unit_text.strip() else "").strip(" .:-–")
+    return first if 0 < len(first) <= 80 and first.count(",") < 2 and ":" not in first else ""
+
+
 async def extract_topics(pages: list[Page]) -> list[dict]:
     """Returns [{unit, name, details}] in syllabus order."""
     topics: list[dict] = []

@@ -27,16 +27,23 @@ def word_overlap(a: str, b: str) -> float:
     return len(wa & wb) / len(wa | wb) if wa | wb else 0.0
 
 
-async def match_topics(space_id: str, texts: list[str]) -> list[tuple[str | None, float | None]]:
-    """For each question text: (topic_id, score) of the closest syllabus topic, or (None, None)."""
+async def match_topics(
+    space_id: str, texts: list[str], units: list[str | None] | None = None
+) -> list[tuple[str | None, float | None]]:
+    """For each question text: (topic_id, score) of the closest syllabus topic, or (None, None).
+    With `units` (question bank questions know their unit) the topic is searched in that unit first."""
     if not texts:
         return []
     vectors = await embed_queries(texts)
     matches = []
-    for vector in vectors:
-        hits = await qdrant.search(
-            qdrant.TOPICS, vector, space_id, limit=1, min_score=settings.topic_match_min_score
-        )
+    for i, vector in enumerate(vectors):
+        unit = units[i] if units else None
+        hits = []
+        if unit:
+            hits = await qdrant.search(qdrant.TOPICS, vector, space_id, limit=1,
+                                       min_score=settings.topic_match_min_score, must=[qdrant.field_is("unit", unit)])
+        if not hits:
+            hits = await qdrant.search(qdrant.TOPICS, vector, space_id, limit=1, min_score=settings.topic_match_min_score)
         matches.append((hits[0].payload["topic_id"], round(hits[0].score, 3)) if hits else (None, None))
     return matches
 

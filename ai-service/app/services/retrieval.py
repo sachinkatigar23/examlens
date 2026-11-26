@@ -39,8 +39,11 @@ def context_block(hits) -> str:
 
 
 def citations(hits, answer: str) -> list[dict]:
-    """One citation per (document, page). If the answer cites pages, keep only those."""
+    """One citation per (document, page). If the answer cites pages, keep only those. If none of its cited pages
+    were in the excerpts (a small model sometimes invents a page number), list the excerpts that were used."""
     cited_pages = {int(p) for p in CITE.findall(answer)}
+    if cited_pages and not cited_pages & {h.payload["page"] for h in hits}:
+        cited_pages = set()
     result, seen = [], set()
     for h in hits:
         key = (h.payload["document_id"], h.payload["page"])

@@ -19,58 +19,45 @@ HISTORY_TURNS = 4
 # Longer answers need more material: marks -> how many note excerpts to retrieve.
 TOP_K = {2: 4, 5: 6, 10: 10, 16: 12}
 
-# Each format is a skeleton the model fills in. A 3B model follows a concrete shape at the END of the
-# prompt far better than rules in the system prompt (measured: rules alone gave 1000-word 10-mark answers
-# with no citations and no diagram).
+# Each format is an ordered outline placed at the END of the prompt: a 3B model follows that far better
+# than rules in the system prompt (measured: rules alone gave 1000-word 10-mark answers with no citations).
+# Written as instructions, not as a template with <placeholders>: the model copied "<sub-heading for part 1>"
+# into its answers. The diagram comes right after the introduction: further down it was dropped 4 times in 5.
 FORMATS = {
     2: {
         "words": "40 to 70",
-        "shape": """<definition in 2-3 lines> [p. N]
-Example: <one short example> [p. N]""",
+        "shape": """- A definition in 2-3 lines ending with its page, like [p. 4].
+- Then one line starting "Example:" with one short example.
+- No headings, no bullet list.""",
     },
     5: {
         "words": "150 to 250",
-        "shape": """<one introduction line> [p. N]
-- **<key term 1>**: <1-2 sentence explanation> [p. N]
-- **<key term 2>**: <1-2 sentence explanation> [p. N]
-- (4 to 6 bullets in total)
-<if the topic has one: a small example, or code in a fenced block>""",
+        "shape": """- One introduction line.
+- Then 4 to 6 bullets. Each bullet starts with a **bold key term**, then a 1-2 sentence explanation ending with its page, like [p. 7].
+- If the topic has one, end with a small example, or code in a fenced block.
+- No headings.""",
     },
     10: {
         "words": "350 to 500",
-        "shape": """## Introduction
-<2-3 lines> [p. N]
-## <sub-heading for part 1>
-<points or a short paragraph> [p. N]
-## <sub-heading for part 2>
-<points or a short paragraph> [p. N]
-(2 to 4 such sub-headings)
-**Diagram to draw:** <what to draw and every label on it>
-## Example
-<worked example, code in a fenced block, or a comparison table>
-## Advantages and disadvantages
-<only if the topic has them>
-## Conclusion
-<2 lines>""",
+        "shape": """1. "## Introduction": 2-3 lines ending with their page, like [p. 4].
+2. "**Diagram to draw:**" on its own line: what to draw and every label on it.
+3. Two to four "## " headings naming the main parts of the topic, each with points; end every point with its page, like [p. 7].
+4. "## Example": a worked example, code in a fenced block, or a comparison table.
+5. "## Advantages and disadvantages": only if the topic has them.
+6. "## Conclusion": 2 lines.""",
     },
     16: {
         "words": "600 to 800",
-        "shape": """## Introduction
-<3-4 lines> [p. N]
-## <sub-heading for part 1>
-<explained in depth with points> [p. N]
-(4 to 6 such sub-headings)
-**Diagram to draw:** <what to draw and every label on it>
-## Example
-<worked example, code in a fenced block, or a comparison table>
-## Advantages and disadvantages
-<if the topic has them>
-## Conclusion
-<3 lines>""",
+        "shape": """1. "## Introduction": 3-4 lines ending with their page, like [p. 4].
+2. "**Diagram to draw:**" on its own line: what to draw and every label on it.
+3. Four to six "## " headings naming the main parts of the topic, each explained in depth with points; end every point with its page, like [p. 7].
+4. "## Example": a worked example, code in a fenced block, or a comparison table.
+5. "## Advantages and disadvantages": if the topic has them.
+6. "## Conclusion": 3 lines.""",
     },
 }
 # Local model only: a hard stop a bit above the target length, so a drifting answer can't run on forever.
-MAX_TOKENS = {2: 250, 5: 600, 10: 1100, 16: 1700}
+MAX_TOKENS = {2: 250, 5: 600, 10: 1300, 16: 1900}
 
 SYSTEM = """You are ExamLens, a tutor helping a university student write exam answers from their OWN notes.
 Rules:
@@ -83,7 +70,7 @@ Rules:
 ANSWER_REQUEST = """Question ({marks} marks): {query}
 
 Write a {marks}-mark exam answer of {words} words, ONLY about "{query}".
-Fill in this shape (replace the <...> parts, keep the headings):
+Structure, in this order:
 
 {shape}
 
