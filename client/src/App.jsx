@@ -1,6 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { GuestOnly, RequireAuth } from './components/RouteGuards.jsx';
 import AppLayout from './components/AppLayout.jsx';
+import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
@@ -10,8 +11,7 @@ import NotFoundPage from './pages/NotFoundPage.jsx';
 export default function App() {
   return (
     <Routes>
-      {/* The 3D landing page arrives in Session 3; until then "/" goes to the app. */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<LandingPage />} />
 
       <Route element={<GuestOnly />}>
         <Route path="/login" element={<LoginPage />} />

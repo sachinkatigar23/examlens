@@ -1,5 +1,6 @@
 import Logo from './Logo.jsx';
 import PageTransition from './PageTransition.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 
 // A tiny, static "topics × years" tally: a preview of what the Analyzer will show.
 const PREVIEW = [
@@ -39,7 +40,7 @@ export default function AuthLayout({ children }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <aside className="ruled ruled-margin hidden border-r border-rule px-16 py-12 lg:flex lg:flex-col lg:pl-24">
-        <Logo to="/login" />
+        <Logo to="/" />
         <div className="my-auto max-w-md">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-pen">Before the paper</p>
           <h1 className="mt-4 text-4xl leading-[1.15] font-medium xl:text-5xl">
@@ -53,8 +54,9 @@ export default function AuthLayout({ children }) {
       </aside>
 
       <main className="flex flex-col px-6 py-10 sm:px-12">
-        <div className="lg:hidden">
-          <Logo to="/login" />
+        <div className="flex items-center justify-between">
+          <span className="lg:hidden"><Logo to="/" /></span>
+          <ThemeToggle className="ml-auto" />
         </div>
         <PageTransition className="mx-auto my-auto w-full max-w-sm py-10">{children}</PageTransition>
       </main>

@@ -7,6 +7,17 @@
     <meta name="theme-color" content="#F5F1E8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>ExamLens</title>
+    <script>
+      // Set the theme before the first paint (saved choice, else the OS setting) so there's no light flash.
+      (function () {
+        var saved = localStorage.getItem('examlens-theme');
+        var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) {
+          document.documentElement.classList.add('dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0F1626');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

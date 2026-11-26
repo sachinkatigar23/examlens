@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import Logo from './Logo.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function AppLayout() {
@@ -12,6 +13,7 @@ export default function AppLayout() {
           <Logo />
           <div className="flex items-center gap-1 sm:gap-3">
             <span className="hidden text-sm text-ink-muted sm:inline">{user?.name}</span>
+            <ThemeToggle />
             <button
               onClick={logout}
               className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-ink-muted hover:bg-ink/5 hover:text-ink"
