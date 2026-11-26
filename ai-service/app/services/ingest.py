@@ -81,11 +81,11 @@ async def _ingest_questions(req: IngestRequest, pages: list[Page]) -> list[dict]
         q["id"] = new_object_id()
         q["topic_id"], q["match_score"] = topic_id, score
         # Same group as a near-identical question from another year; otherwise a group of its own.
-        q["repeat_group"] = await find_repeat_group(req.space_id, vector, year, req.document_id) or q["id"]
+        q["repeat_group"] = await find_repeat_group(req.space_id, q["text"], vector, year, req.document_id) or q["id"]
 
     payloads = [
         {"space_id": req.space_id, "document_id": req.document_id, "question_id": q["id"], "year": year,
-         "repeat_group": q["repeat_group"]}
+         "repeat_group": q["repeat_group"], "text": q["text"]}
         for q in questions
     ]
     await qdrant.upsert(qdrant.QUESTIONS, vectors, payloads)

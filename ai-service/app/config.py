@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     ask_top_k: int = 5
     ask_min_score: float = 0.55  # below this the best chunk isn't really about the question
     topic_match_min_score: float = 0.55
-    # Measured: same question reworded scores >= 0.95; different questions on one topic reach ~0.90.
-    repeat_min_score: float = 0.92
+    # Repeats need BOTH: embedding similarity >= 0.85 and >= 60% shared content words (see services/matching.py).
+    # Measured on the CN papers: half vs full duplex = 0.93 similar but 50% words; true rewordings 0.87-1.0, 100%.
+    repeat_min_score: float = 0.85
+    repeat_min_word_overlap: float = 0.6
 
     @property
     def upload_path(self) -> Path:

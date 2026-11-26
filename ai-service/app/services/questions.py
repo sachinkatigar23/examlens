@@ -27,6 +27,8 @@ MARKS = re.compile(
 )
 # "PART - B", "SECTION C", "Part II": ends the current question; text after it is instructions until the next number.
 SECTION_HEADING = re.compile(r"^\s*(part|section)\s*[-–:]?\s*([a-e]|[ivx]+|\d)\b", re.IGNORECASE)
+# Section instructions like "Answer any SIX questions. (6 x 2 = 12)": every question in it is worth 2 marks.
+SECTION_MARKS = re.compile(r"\(\s*\d+\s*[x×X*]\s*(\d{1,2})\s*=\s*\d+\s*\)")
 # Headers and instructions that look like numbered items but aren't questions.
 INSTRUCTION = re.compile(
     r"answer\s+(any|all|the following|five|ten)|all questions carry|max(imum)?\.?\s*marks|time\s*:|duration"
@@ -40,6 +42,7 @@ class _Item:
     qnum: str
     letter: str = ""
     lines: list[str] = field(default_factory=list)
+    section_marks: int | None = None  # from the section's "(6 x 2 = 12)" line, used if the question shows none
 
     @property
     def text(self) -> str:
@@ -61,20 +64,23 @@ def _is_question(text: str) -> bool:
 
 def extract_with_regex(pages: list[Page]) -> list[dict]:
     items: list[_Item] = []
-    collecting = False  # False before the first question and right after a section heading
+    collecting = False  # False before the first question, after a section heading, and after a question's marks
+    section_marks = None
     for line in (l for p in pages for l in p.text.splitlines()):
         line = line.strip()
         if not line or re.fullmatch(r"(?i)or|\(?or\)?", line):
             continue
         if SECTION_HEADING.match(line):
-            collecting = False
+            collecting, section_marks = False, None
             continue
+        if per_question := SECTION_MARKS.search(line):
+            section_marks = int(per_question.group(1))
         q = Q_START.match(line)
         sub = SUB_START.match(line)
         current = items[-1] if items and collecting else None
 
         if q:
-            items.append(_Item(qnum=q.group(1), letter=(q.group(2) or "").lower(), lines=[q.group(3)]))
+            items.append(_Item(q.group(1), (q.group(2) or "").lower(), [q.group(3)], section_marks))
             collecting = True
         elif sub and current:
             letter = sub.group(1)
@@ -82,7 +88,10 @@ def extract_with_regex(pages: list[Page]) -> list[dict]:
             if letter == "i" and current.letter != "h":
                 current.lines.append(line)
             else:
-                items.append(_Item(qnum=current.qnum, letter=letter, lines=[sub.group(2)]))
+                items.append(_Item(current.qnum, letter, [sub.group(2)], section_marks))
+        elif current and MARKS.search(current.text):
+            # Marks end a question, so this line is something else (a footer, an instruction): stop here.
+            collecting = False
         elif current:
             current.lines.append(line)
         # otherwise: header / instructions before the first question or after a section heading: ignored
@@ -99,7 +108,7 @@ def extract_with_regex(pages: list[Page]) -> list[dict]:
         if stem and len(text) < 60 and _is_question(stem):
             text = f"{stem} {text}"
         if _is_question(text):
-            questions.append({"number": f"{it.qnum}{it.letter}", "text": text, "marks": marks})
+            questions.append({"number": f"{it.qnum}{it.letter}", "text": text, "marks": marks or it.section_marks})
     return questions
 
 

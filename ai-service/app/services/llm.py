@@ -46,7 +46,8 @@ async def chat_json(system: str, user: str, schema: type[T]) -> T:
         "model": settings.chat_model,
         "stream": False,
         "format": schema.model_json_schema(),
-        "options": {"temperature": 0, "num_ctx": CONTEXT_TOKENS},
+        # Extraction (syllabus topics, questions) must be repeatable: temperature 0 + a fixed seed.
+        "options": {"temperature": 0, "seed": 42, "num_ctx": CONTEXT_TOKENS},
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
     last_error: Exception | None = None
@@ -64,7 +65,8 @@ async def chat_stream(messages: list[dict]) -> AsyncIterator[str]:
     body = {
         "model": settings.chat_model,
         "stream": True,
-        "options": {"temperature": 0.2, "num_ctx": CONTEXT_TOKENS},
+        # Low but not 0: answers read naturally, yet refusals stay consistent (0.2 flipped some to "couldn't find").
+        "options": {"temperature": 0.1, "num_ctx": CONTEXT_TOKENS},
         "messages": messages,
     }
     try:

@@ -40,12 +40,44 @@ def split_units(pages: list[Page]) -> list[tuple[str, str]]:
     return [(label, "\n".join(lines).strip()) for label, lines in units if "".join(lines).strip()]
 
 
+LABELLED = re.compile(r"^([A-Z][^:.]{2,60}):\s*(.+)$")  # "Network topologies: bus, star, ring, mesh."
+HOURS = re.compile(r"\(\s*\d+\s*(hours?|hrs?)\s*\)", re.IGNORECASE)
+SENTENCE_END = re.compile(r"(?<=\.)\s+(?=[A-Z])")
+
+
+def parse_labelled_topics(unit_text: str) -> list[dict] | None:
+    """Many syllabi list a unit as sentences "Label: item, item, item." Then the labels ARE the topics, so we read
+    them directly (exact, repeatable, no LLM). Returns None if the unit isn't written that way."""
+    lines = [l.strip() for l in unit_text.splitlines() if l.strip()]
+    # First line like "Introduction to Data Communication (12 Hours)" is the unit's title, not a topic.
+    if len(lines) > 1 and ":" not in lines[0] and not lines[0].endswith("."):
+        lines = lines[1:]
+    body = HOURS.sub("", " ".join(lines))
+    topics, labelled = [], 0
+    for sentence in SENTENCE_END.split(body):
+        sentence = sentence.strip().rstrip(".")
+        if not sentence:
+            continue
+        if m := LABELLED.match(sentence):
+            labelled += 1
+            topics.append({"name": m.group(1).strip(), "details": m.group(2).strip()})
+        elif len(sentence.split()) <= 14:
+            # A short plain sentence is a topic by itself: "Functions of the network layer."
+            name = re.split(r"[,;]", sentence)[0].strip()
+            topics.append({"name": name, "details": sentence})
+    return topics if labelled >= 2 else None
+
+
 async def extract_topics(pages: list[Page]) -> list[dict]:
     """Returns [{unit, name, details}] in syllabus order."""
     topics: list[dict] = []
     units = split_units(pages)
     if len(units) >= 2:
         for label, text in units:
+            parsed = parse_labelled_topics(text)
+            if parsed:
+                topics.extend({"unit": label, **t} for t in parsed)
+                continue
             result = await chat_json(SYSTEM, f"This is {label} of the syllabus:\n\n{text[:5000]}", ExtractedTopics)
             topics.extend({"unit": label, "name": t.name.strip(), "details": t.details.strip()} for t in result.topics)
     else:
