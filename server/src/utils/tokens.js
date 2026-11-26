@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { env, isProduction } from '../config/env.js';
+import { cookieSecure, env } from '../config/env.js';
 
 export const REFRESH_COOKIE = 'refreshToken';
 
@@ -31,7 +31,7 @@ export function verifyRefreshToken(token) {
 // Cookie is scoped to the auth routes, so it isn't sent with every API call.
 const cookieOptions = {
   httpOnly: true,
-  secure: isProduction,
+  secure: cookieSecure,
   sameSite: 'lax', // localhost:5173 and localhost:5000 are the same site
   path: '/api/v1/auth',
 };

@@ -25,6 +25,10 @@ export const env = {
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
   serviceKey: process.env.SERVICE_KEY,
   uploadDir: path.resolve(serverRoot, process.env.UPLOAD_DIR || '../storage/uploads'),
+  // Number of proxies in front of the app (1 behind the nginx container) so req.ip is the real client.
+  trustProxy: Number(process.env.TRUST_PROXY) || 0,
 };
 
 export const isProduction = env.nodeEnv === 'production';
+// Secure cookies need https. Docker on localhost is plain http, so it can be switched off explicitly.
+export const cookieSecure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProduction;

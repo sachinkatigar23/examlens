@@ -1,23 +1,126 @@
-# Session 1: databases only. server, ai-service and client are added in Session 3.
+# ExamLens: the whole stack. Ollama is NOT in here: it runs on the host so it can use the GPU.
+#
+#   cp .env.example .env          # then put real random values in the three secrets
+#   docker compose up -d --build  # app on http://localhost:8080
+#   docker compose --profile demo up seed   # optional: demo account + everything in samples/
+#
+# Dev mode (npm run dev / uvicorn on the host) only needs:  docker compose up -d mongo qdrant
+
 services:
   mongo:
     image: mongo:7
     container_name: examlens-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27017:27017" # published for dev mode on the host
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   qdrant:
     image: qdrant/qdrant:latest
     container_name: examlens-qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"
+      - "6333:6333" # published for dev mode on the host
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ai-service:
+    build: ./ai-service
+    container_name: examlens-ai
+    restart: unless-stopped
+    # Not published: only the server talks to it (X-Service-Key).
+    environment:
+      SERVICE_KEY: ${SERVICE_KEY:?set SERVICE_KEY in .env}
+      NODE_API_URL: http://server:5000
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://host.docker.internal:11434
+      CHAT_MODEL: ${CHAT_MODEL:-qwen2.5:3b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # needed on Linux; Docker Desktop has it already
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  server:
+    build: ./server
+    container_name: examlens-server
+    restart: unless-stopped
+    # Not published: the browser reaches it through nginx at http://localhost:8080/api
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/examlens
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 7d
+      CLIENT_URL: http://localhost:8080
+      AI_SERVICE_URL: http://ai-service:8000
+      SERVICE_KEY: ${SERVICE_KEY}
+      UPLOAD_DIR: /data/uploads
+      TRUST_PROXY: 1
+      COOKIE_SECURE: "false" # plain http on localhost
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  client:
+    build: ./client
+    container_name: examlens-client
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # Optional: `docker compose --profile demo up seed` creates the demo account and uploads samples/.
+  seed:
+    image: node:24-slim
+    profiles: ["demo"]
+    working_dir: /work
+    command: ["node", "scripts/seed-demo.mjs"]
+    environment:
+      API_URL: http://server:5000/api/v1
+      SAMPLES_DIR: /work/samples
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@examlens.local}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-examlens-demo}
+    volumes:
+      - ./scripts:/work/scripts:ro
+      - ./samples:/work/samples:ro
+    depends_on:
+      server:
+        condition: service_healthy
 
 volumes:
   mongo_data:
   qdrant_data:
+  uploads:
