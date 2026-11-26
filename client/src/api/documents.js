@@ -15,4 +15,7 @@ export function uploadDocument(spaceId, { file, kind, year }, onProgress) {
     .then((r) => r.data.document);
 }
 
-export const deleteDocument = (spaceId, docId) => api.delete(`/spaces/${spaceId}/documents/${docId}`);
+export const retryDocument = (spaceId, docId) =>
+  api.post(`/spaces/${spaceId}/documents/${docId}/retry`).then((r) => r.data.document);
+
+export const deleteDocument =(spaceId, docId) => api.delete(`/spaces/${spaceId}/documents/${docId}`);

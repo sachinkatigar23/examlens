@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, RotateCcw, Trash2 } from 'lucide-react';
 import StatusChip from './StatusChip.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import { formatBytes, plural } from '../utils/format.js';
@@ -11,7 +11,7 @@ const GROUPS = [
   { kind: 'paper', title: 'Past papers', empty: 'Three or more past papers make the Analyzer worth it.' },
 ];
 
-export default function DocumentList({ documents, onDelete }) {
+export default function DocumentList({ documents, onDelete, onRetry }) {
   const [toDelete, setToDelete] = useState(null);
 
   return (
@@ -32,7 +32,7 @@ export default function DocumentList({ documents, onDelete }) {
               <ul className="mt-2 divide-y divide-rule border-y border-rule">
                 <AnimatePresence initial={false}>
                   {docs.map((doc) => (
-                    <DocumentRow key={doc._id} doc={doc} onDelete={() => setToDelete(doc)} />
+                    <DocumentRow key={doc._id} doc={doc} onDelete={() => setToDelete(doc)} onRetry={() => onRetry(doc)} />
                   ))}
                 </AnimatePresence>
               </ul>
@@ -53,7 +53,14 @@ export default function DocumentList({ documents, onDelete }) {
   );
 }
 
-function DocumentRow({ doc, onDelete }) {
+// Same rule as the server: failed, or "processing" for so long that the AI service must have restarted.
+const STALE_MS = 10 * 60 * 1000;
+const canRetry = (doc) =>
+  doc.status === 'failed' ||
+  (['queued', 'processing'].includes(doc.status) && Date.now() - new Date(doc.updatedAt).getTime() > STALE_MS);
+
+function DocumentRow({ doc, onDelete, onRetry }) {
+  const [retrying, setRetrying] = useState(false);
   const meta = [
     doc.kind === 'paper' && doc.year,
     doc.pages && plural(doc.pages, 'page'),
@@ -76,6 +83,21 @@ function DocumentRow({ doc, onDelete }) {
           <p className="font-mono text-xs text-ink-muted">{meta.join(' · ')}</p>
         </div>
         <StatusChip status={doc.status} />
+        {canRetry(doc) && (
+          <button
+            onClick={async () => {
+              setRetrying(true);
+              await onRetry();
+              setRetrying(false);
+            }}
+            disabled={retrying}
+            aria-label={`Retry ${doc.originalName}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-ink hover:bg-ink/5 disabled:opacity-50"
+          >
+            <RotateCcw size={14} aria-hidden="true" className={retrying ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Retry</span>
+          </button>
+        )}
         <button
           onClick={onDelete}
           className="rounded-md p-2 text-ink-muted transition-colors hover:bg-pen/10 hover:text-pen"

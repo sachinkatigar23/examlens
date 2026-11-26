@@ -10,6 +10,7 @@ let accessToken = null;
 export const setAccessToken = (token) => {
   accessToken = token;
 };
+export const getAccessToken = () => accessToken; // for fetch() calls that can't use axios (streaming)
 
 let onSessionExpired = () => {};
 export const setSessionExpiredHandler = (fn) => {

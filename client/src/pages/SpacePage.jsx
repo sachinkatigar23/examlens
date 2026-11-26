@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MessageSquareText, Pencil, Table2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import PageTransition from '../components/PageTransition.jsx';
 import DocumentsTab from '../components/DocumentsTab.jsx';
+import AskTab from '../components/AskTab.jsx';
+import AnalyzerTab from '../components/AnalyzerTab.jsx';
 import SpaceFormDialog from '../components/SpaceFormDialog.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import Button from '../components/Button.jsx';
@@ -27,6 +29,9 @@ export default function SpacePage() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Tabs stay mounted once opened, so a streaming answer survives switching to Documents and back.
+  const [visited, setVisited] = useState(() => new Set([tab]));
+  useEffect(() => setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab))), [tab]);
 
   useEffect(() => {
     setSpace(null);
@@ -88,21 +93,14 @@ export default function SpacePage() {
       </nav>
 
       <div className="mt-8">
-        {tab === 'documents' && <DocumentsTab spaceId={space._id} />}
-        {tab === 'ask' && (
-          <ComingNext
-            Icon={MessageSquareText}
-            title="Ask ExamLens"
-            text="Ask a doubt and get an answer written only from your notes, with page numbers you can check. It switches on once the AI service is running."
-          />
+        {visited.has('documents') && (
+          <div hidden={tab !== 'documents'}><DocumentsTab spaceId={space._id} /></div>
         )}
-        {tab === 'analyzer' && (
-          <ComingNext
-            Icon={Table2}
-            title="Analyzer"
-            text="A topics × years grid of your past papers: what's asked every year, what's asked again word for word, and what you can safely skim."
-          />
+        {visited.has('ask') && (
+          <div hidden={tab !== 'ask'}><AskTab spaceId={space._id} /></div>
         )}
+        {/* The analyzer re-mounts on every visit so it shows papers processed since. */}
+        {tab === 'analyzer' && <AnalyzerTab spaceId={space._id} />}
       </div>
 
       <SpaceFormDialog
@@ -137,15 +135,5 @@ function BackLink() {
     <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink">
       <ArrowLeft size={16} aria-hidden="true" /> All notebooks
     </Link>
-  );
-}
-
-function ComingNext({ Icon, title, text }) {
-  return (
-    <div className="ruled ruled-margin card-surface max-w-2xl px-6 py-10 pl-16">
-      <Icon size={22} className="text-pen" aria-hidden="true" />
-      <h2 className="mt-3 text-2xl font-semibold">{title}</h2>
-      <p className="mt-2 text-ink-muted">{text}</p>
-    </div>
   );
 }
