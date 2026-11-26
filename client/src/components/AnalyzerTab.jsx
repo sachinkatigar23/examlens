@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import FormError from './FormError.jsx';
 import Heatmap from './Heatmap.jsx';
 import QuestionPanel from './QuestionPanel.jsx';
+import AnswerToggle from './AnswerToggle.jsx';
 import { getAnalysis } from '../api/analysis.js';
 import { errorMessage } from '../api/client.js';
 import { plural } from '../utils/format.js';
@@ -98,7 +99,7 @@ export default function AnalyzerTab({ spaceId }) {
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         {data.hotTopics.length > 0 && <HotTopics topics={data.hotTopics} paperCount={data.paperCount} />}
-        <Repeats repeats={data.repeats} />
+        <Repeats repeats={data.repeats} spaceId={spaceId} />
       </div>
     </div>
   );
@@ -162,7 +163,7 @@ function HotTopics({ topics, paperCount }) {
   );
 }
 
-function Repeats({ repeats }) {
+function Repeats({ repeats, spaceId }) {
   return (
     <section aria-labelledby="repeats-title">
       <h3 id="repeats-title" className="text-2xl font-semibold">Asked again</h3>
@@ -186,6 +187,7 @@ function Repeats({ repeats }) {
                 ))}
                 {r.topic && <span className="ml-1 text-xs text-ink-muted">· {r.topic}</span>}
               </div>
+              {r.questionId && <AnswerToggle spaceId={spaceId} question={{ _id: r.questionId, marks: r.marks }} />}
             </motion.li>
           ))}
         </ul>

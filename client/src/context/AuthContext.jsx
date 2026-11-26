@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       status,
+      setUser, // after settings change (e.g. the default Local/Cloud mode)
       login: async (credentials) => signIn(await loginUser(credentials)),
       register: async (details) => signIn(await registerUser(details)),
       logout: async () => {

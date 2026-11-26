@@ -1,6 +1,7 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { uploadDocument } from '../api/documents.js';
+import { getStudyPlan } from '../api/study.js';
 import { errorMessage } from '../api/client.js';
 import { formatBytes } from '../utils/format.js';
 
@@ -9,7 +10,10 @@ const KINDS = [
   { value: 'syllabus', label: 'Syllabus' },
   { value: 'notes', label: 'Notes' },
   { value: 'paper', label: 'Past paper' },
+  { value: 'important', label: 'Important Qs', title: "Your college's important questions PDF (question bank)" },
 ];
+// Offered when the notebook has no units yet (no syllabus or question bank uploaded).
+const FALLBACK_UNITS = ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4', 'Unit 5'].map((unit) => ({ unit, unitTitle: '' }));
 const LAST_YEAR = new Date().getFullYear() - 1;
 
 // Checked here for a fast answer; the server checks again (and properly).
@@ -24,6 +28,16 @@ export default function UploadTray({ spaceId, onUploaded }) {
   const inputId = useId();
   const [kind, setKind] = useState('notes');
   const [year, setYear] = useState(LAST_YEAR);
+  const [unit, setUnit] = useState('mixed');
+  const [units, setUnits] = useState(FALLBACK_UNITS);
+
+  // Units come from the syllabus (or the question bank). Re-read whenever notes are about to be uploaded.
+  useEffect(() => {
+    if (kind !== 'notes') return;
+    getStudyPlan(spaceId)
+      .then((p) => setUnits(p.units.length ? p.units : FALLBACK_UNITS))
+      .catch(() => {});
+  }, [kind, spaceId]);
   const [dragging, setDragging] = useState(false);
   const [items, setItems] = useState([]); // [{ id, name, progress, error, done }]
 
@@ -45,7 +59,7 @@ export default function UploadTray({ spaceId, onUploaded }) {
     for (const item of batch) {
       if (item.error) continue;
       try {
-        const doc = await uploadDocument(spaceId, { file: item.file, kind, year: yearNumber }, (p) =>
+        const doc = await uploadDocument(spaceId, { file: item.file, kind, year: yearNumber, unit }, (p) =>
           patch(item.id, { progress: p }),
         );
         patch(item.id, { progress: 100, done: true });
@@ -69,9 +83,9 @@ export default function UploadTray({ spaceId, onUploaded }) {
 
       <fieldset className="mt-4">
         <legend className="sr-only">What are you uploading?</legend>
-        <div className="grid grid-cols-3 rounded-md border border-rule bg-paper p-1 text-sm">
+        <div className="grid grid-cols-2 gap-0.5 rounded-md border border-rule bg-paper p-1 text-sm">
           {KINDS.map((k) => (
-            <label key={k.value} className="cursor-pointer">
+            <label key={k.value} className="cursor-pointer" title={k.title}>
               <input
                 type="radio"
                 name={`${inputId}-kind`}
@@ -108,6 +122,35 @@ export default function UploadTray({ spaceId, onUploaded }) {
                 onChange={(e) => setYear(e.target.value)}
                 className="w-24 border-0 border-b-2 border-ink/25 bg-transparent py-1 text-right font-mono text-ink focus:border-pen focus:outline-none"
               />
+            </label>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {kind === 'notes' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <label className="mt-4 flex items-center justify-between gap-3 text-sm">
+              <span className="text-ink-muted">Which unit?</span>
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="max-w-48 rounded-md border border-rule bg-card px-2 py-1 text-sm text-ink focus:border-pen focus:outline-none"
+              >
+                <option value="mixed">Mixed / whole subject</option>
+                {units.map((u) => (
+                  <option key={u.unit} value={u.unit}>
+                    {u.unit}
+                    {u.unitTitle ? ` · ${u.unitTitle}` : ''}
+                  </option>
+                ))}
+              </select>
             </label>
           </motion.div>
         )}

@@ -6,6 +6,8 @@ import PageTransition from '../components/PageTransition.jsx';
 import DocumentsTab from '../components/DocumentsTab.jsx';
 import AskTab from '../components/AskTab.jsx';
 import AnalyzerTab from '../components/AnalyzerTab.jsx';
+import StudyTab from '../components/StudyTab.jsx';
+import QuestionBankTab from '../components/QuestionBankTab.jsx';
 import SpaceFormDialog from '../components/SpaceFormDialog.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import Button from '../components/Button.jsx';
@@ -15,7 +17,9 @@ import { errorMessage } from '../api/client.js';
 
 const TABS = [
   { id: 'documents', label: 'Documents' },
+  { id: 'study', label: 'Study' },
   { id: 'ask', label: 'Ask' },
+  { id: 'bank', label: 'Question Bank' },
   { id: 'analyzer', label: 'Analyzer' },
 ];
 
@@ -70,13 +74,13 @@ export default function SpacePage() {
 
       <FormError message={error} />
 
-      <nav className="mt-8 flex gap-6 border-b border-rule" aria-label="Notebook sections">
+      <nav className="mt-8 -mx-4 flex gap-6 overflow-x-auto border-b border-rule px-4 sm:mx-0 sm:px-0" aria-label="Notebook sections">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setParams(t.id === 'documents' ? {} : { tab: t.id }, { replace: true })}
             aria-current={tab === t.id ? 'page' : undefined}
-            className={`relative pb-3 text-sm font-medium transition-colors duration-150 ${
+            className={`relative shrink-0 pb-3 text-sm font-medium transition-colors duration-150 ${
               tab === t.id ? 'text-ink' : 'text-ink-muted hover:text-ink'
             }`}
           >
@@ -96,8 +100,14 @@ export default function SpacePage() {
         {visited.has('documents') && (
           <div hidden={tab !== 'documents'}><DocumentsTab spaceId={space._id} /></div>
         )}
+        {visited.has('study') && (
+          <div hidden={tab !== 'study'}><StudyTab spaceId={space._id} /></div>
+        )}
         {visited.has('ask') && (
           <div hidden={tab !== 'ask'}><AskTab spaceId={space._id} /></div>
+        )}
+        {visited.has('bank') && (
+          <div hidden={tab !== 'bank'}><QuestionBankTab spaceId={space._id} /></div>
         )}
         {/* The analyzer re-mounts on every visit so it shows papers processed since. */}
         {tab === 'analyzer' && <AnalyzerTab spaceId={space._id} />}

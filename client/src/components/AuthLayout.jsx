@@ -2,19 +2,20 @@ import Logo from './Logo.jsx';
 import PageTransition from './PageTransition.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 
-// A tiny, static "topics × years" tally: a preview of what the Analyzer will show.
+// A tiny, static "topics × years" tally: a preview of what the Analyzer shows. Real rows from the demo data
+// (samples/: Computer Networks papers 2022–2025), so the claim above is true.
 const PREVIEW = [
-  { topic: 'Normalization', marks: [1, 1, 1, 0, 1, 1, 1, 1] },
-  { topic: 'Transactions', marks: [1, 0, 1, 1, 0, 1, 0, 1] },
-  { topic: 'ER diagrams', marks: [0, 1, 0, 1, 1, 0, 1, 0] },
-  { topic: 'Indexing', marks: [0, 0, 1, 0, 0, 1, 0, 0] },
+  { topic: 'Network models', marks: [1, 1, 1, 1] },
+  { topic: 'Congestion control', marks: [1, 1, 1, 1] },
+  { topic: 'Data communication', marks: [1, 1, 1, 0] },
+  { topic: 'Guided media', marks: [1, 1, 0, 0] },
 ];
-const YEARS = ['17', '18', '19', '20', '21', '22', '23', '24'];
+const YEARS = ['22', '23', '24', '25'];
 
 function TallyPreview() {
   return (
-    <figure aria-label="Example: how often each DBMS topic was asked from 2017 to 2024" className="mt-10">
-      <div className="grid grid-cols-[7.5rem_repeat(8,minmax(0,1fr))] gap-1.5 font-mono text-[11px] text-ink-muted">
+    <figure aria-label="Example: how often each Computer Networks topic was asked from 2022 to 2025" className="mt-10">
+      <div className="grid grid-cols-[9rem_repeat(4,minmax(0,1fr))] gap-1.5 font-mono text-[11px] text-ink-muted">
         <span />
         {YEARS.map((y) => (
           <span key={y} className="text-center">’{y}</span>
@@ -44,7 +45,7 @@ export default function AuthLayout({ children }) {
         <div className="my-auto max-w-md">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-pen">Before the paper</p>
           <h1 className="mt-4 text-4xl leading-[1.15] font-medium xl:text-5xl">
-            Seven of the last eight DBMS papers asked about <span className="highlighted">normalization</span>.
+            <span className="highlighted">Network models</span> came up in all 4 sample papers.
             <br />
             <em className="font-normal">Now you know.</em>
           </h1>

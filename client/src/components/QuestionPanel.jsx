@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { listQuestions, moveQuestion } from '../api/analysis.js';
+import AnswerToggle from './AnswerToggle.jsx';
 import { errorMessage } from '../api/client.js';
 
 // The actual questions behind a heatmap cell (or the unmatched / low-confidence ones).
@@ -123,6 +124,9 @@ function QuestionRow({ spaceId, question, topics, showYear, onMoved }) {
           </span>
         )}
         {error && <span className="text-xs text-pen">{error}</span>}
+      </div>
+      <div className="ml-19">
+        <AnswerToggle spaceId={spaceId} question={q} />
       </div>
     </li>
   );

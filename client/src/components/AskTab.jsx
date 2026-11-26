@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUp, BookOpenText, Eraser, Square } from 'lucide-react';
-import AnswerText from './AnswerText.jsx';
+import { ArrowUp, BookOpenText, Camera, Eraser, Square } from 'lucide-react';
+import Markdown from './Markdown.jsx';
 import CitationSticker from './CitationSticker.jsx';
 import FormError from './FormError.jsx';
+import ModeToggle from './ModeToggle.jsx';
+import ModelBadge from './ModelBadge.jsx';
+import AnswerError from './AnswerError.jsx';
+import SnapDoubt, { PhotoThumb } from './SnapDoubt.jsx';
 import { clearMessages, listMessages, streamAnswer } from '../api/ask.js';
 import { getAnalysis } from '../api/analysis.js';
 import { errorMessage } from '../api/client.js';
+import { useModeState } from '../context/ModelContext.jsx';
 
 const NOT_FOUND_PREFIX = "I couldn't find this in your notes";
 
@@ -16,61 +21,68 @@ const reveal = {
   transition: { duration: 0.2, ease: 'easeOut' },
 };
 
-export default function AskTab({ spaceId }) {
-  const [messages, setMessages] = useState(null); // [{ id, role, content, citations, pending?, error? }]
+// The Ask tab (thread "ask"), also used compact under a lesson as the unit's follow-up chat ("study:<unit>").
+export default function AskTab({ spaceId, thread = 'ask', compact = false, placeholder, starters }) {
+  const [messages, setMessages] = useState(null); // [{ id, role, content, citations, provider, model, pending?, error? }]
   const [question, setQuestion] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
+  const [mode, setMode] = useModeState();
+  const [snapping, setSnapping] = useState(false);
   const abortRef = useRef(null);
   const endRef = useRef(null);
+  const isAskTab = thread === 'ask';
 
   useEffect(() => {
-    listMessages(spaceId)
+    listMessages(spaceId, thread)
       .then((list) => setMessages(list.map((m) => ({ ...m, id: m._id }))))
       .catch((err) => {
         setError(errorMessage(err));
         setMessages([]);
       });
     // Suggest questions about the topics exams ask most (if papers are analysed already).
-    getAnalysis(spaceId)
-      .then((a) => setSuggestions(a.hotTopics.slice(0, 3).map((t) => `Explain ${t.name.toLowerCase()} for a 10-mark answer`)))
-      .catch(() => {});
+    if (isAskTab) {
+      getAnalysis(spaceId)
+        .then((a) => setSuggestions(a.hotTopics.slice(0, 3).map((t) => `Explain ${t.name.toLowerCase()} for 10 marks`)))
+        .catch(() => {});
+    }
     return () => abortRef.current?.abort();
-  }, [spaceId]);
+  }, [spaceId, thread, isAskTab]);
 
-  // Keep the newest text in view while it streams in.
+  // Keep the newest text in view while it streams in (not in the compact chat: it sits under a lesson).
   const lastContent = messages?.[messages.length - 1]?.content;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages?.length, lastContent]);
+    if (!compact) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages?.length, lastContent, compact]);
 
   const patchLast = (changes) =>
     setMessages((list) => list.map((m, i) => (i === list.length - 1 ? { ...m, ...(typeof changes === 'function' ? changes(m) : changes) } : m)));
 
-  async function ask(text) {
+  async function ask(text, { photo, useMode = mode, replaceLast = false } = {}) {
     const q = text.trim();
     if (q.length < 2 || streaming) return;
     setError('');
     setQuestion('');
     setStreaming(true);
     setMessages((list) => [
-      ...list,
-      { id: `q-${Date.now()}`, role: 'user', content: q },
-      { id: `a-${Date.now()}`, role: 'assistant', content: '', citations: [], pending: true },
+      ...(replaceLast ? list.slice(0, -2) : list),
+      { id: `q-${Date.now()}`, role: 'user', content: q, photo: photo?._id, localPhotoUrl: photo?.localUrl },
+      { id: `a-${Date.now()}`, role: 'assistant', content: '', citations: [], pending: true, mode: useMode, photo },
     ]);
 
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const { citations } = await streamAnswer(spaceId, q, {
-        signal: controller.signal,
-        onToken: (t) => patchLast((m) => ({ content: m.content + t })),
-      });
-      patchLast({ citations, pending: false });
+      const done = await streamAnswer(
+        spaceId,
+        { question: q, mode: useMode, thread, photoId: photo?._id },
+        { signal: controller.signal, onToken: (t) => patchLast((m) => ({ content: m.content + t })) },
+      );
+      patchLast({ citations: done.citations ?? [], provider: done.provider, model: done.model, marks: done.marks, pending: false });
     } catch (err) {
-      if (err.name === 'AbortError') patchLast((m) => ({ pending: false, stopped: true, content: m.content }));
-      else patchLast({ pending: false, error: err.message });
+      if (err.name === 'AbortError') patchLast({ pending: false, stopped: true });
+      else patchLast({ pending: false, error: { message: err.message, code: err.code } });
     } finally {
       setStreaming(false);
       abortRef.current = null;
@@ -79,7 +91,7 @@ export default function AskTab({ spaceId }) {
 
   async function handleClear() {
     try {
-      await clearMessages(spaceId);
+      await clearMessages(spaceId, thread);
       setMessages([]);
     } catch (err) {
       setError(errorMessage(err));
@@ -88,46 +100,75 @@ export default function AskTab({ spaceId }) {
 
   if (messages === null) return <p className="font-mono text-sm text-ink-muted" role="status">Finding your notes…</p>;
 
+  const lastIndex = messages.length - 1;
   return (
-    <div className="mx-auto flex max-w-3xl flex-col">
+    <div className={`mx-auto flex flex-col ${compact ? '' : 'max-w-3xl'}`}>
       <FormError message={error} />
 
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <ModeToggle mode={mode} onChange={setMode} />
+        {messages.length > 0 && (
+          <button
+            onClick={handleClear}
+            disabled={streaming}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink disabled:opacity-50"
+          >
+            <Eraser size={14} aria-hidden="true" /> Clear chat
+          </button>
+        )}
+      </div>
+
       {messages.length === 0 ? (
-        <EmptyAsk suggestions={suggestions} onPick={ask} />
+        compact ? (
+          <StarterChips starters={starters} onPick={ask} />
+        ) : (
+          <EmptyAsk suggestions={suggestions} onPick={ask} />
+        )
       ) : (
-        <>
-          <div className="mb-2 flex justify-end">
-            <button
-              onClick={handleClear}
-              disabled={streaming}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink disabled:opacity-50"
-            >
-              <Eraser size={14} aria-hidden="true" /> Clear chat
-            </button>
-          </div>
-          <ol className="space-y-6" aria-live="polite" aria-busy={streaming}>
-            <AnimatePresence initial={false}>
-              {messages.map((m) => (
-                <motion.li key={m.id} {...reveal}>
-                  {m.role === 'user' ? <Question text={m.content} /> : <Answer message={m} />}
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ol>
-        </>
+        <ol className="space-y-6" aria-live="polite" aria-busy={streaming}>
+          <AnimatePresence initial={false}>
+            {messages.map((m, i) => (
+              <motion.li key={m.id} {...reveal}>
+                {m.role === 'user' ? (
+                  <Question message={m} spaceId={spaceId} />
+                ) : (
+                  <Answer
+                    message={m}
+                    onUseCloud={
+                      i === lastIndex && !streaming
+                        ? () => ask(messages[i - 1].content, { useMode: 'cloud', replaceLast: true, photo: m.photo })
+                        : null
+                    }
+                  />
+                )}
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ol>
       )}
       <div ref={endRef} />
+
+      {snapping && (
+        <SnapDoubt
+          spaceId={spaceId}
+          onCancel={() => setSnapping(false)}
+          onSolve={(text, photo) => {
+            setSnapping(false);
+            ask(text, { photo });
+          }}
+        />
+      )}
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
           ask(question);
         }}
-        className="card-surface sticky bottom-4 mt-8 flex items-end gap-2 p-2 pl-4"
+        className={`card-surface ${compact ? 'mt-4' : 'sticky bottom-4 mt-8'} flex items-end gap-2 p-2 pl-4`}
       >
-        <label htmlFor="ask-input" className="sr-only">Ask a question about your notes</label>
+        <label htmlFor={`ask-input-${thread}`} className="sr-only">Ask a question about your notes</label>
         <textarea
-          id="ask-input"
+          id={`ask-input-${thread}`}
           rows={1}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -137,10 +178,21 @@ export default function AskTab({ spaceId }) {
               ask(question);
             }
           }}
-          maxLength={2000}
-          placeholder="Ask from your notes… e.g. What is BCNF?"
+          maxLength={4000}
+          placeholder={placeholder ?? 'Ask from your notes… e.g. Explain BFS for 10 marks'}
           className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base text-ink placeholder:text-ink-muted/70 focus:outline-none field-sizing-content"
         />
+        {isAskTab && !streaming && (
+          <button
+            type="button"
+            onClick={() => setSnapping(true)}
+            className="grid size-10 shrink-0 place-items-center rounded-md text-ink-muted hover:bg-ink/5 hover:text-ink"
+            aria-label="Snap a doubt: ask about a photo"
+            title="Snap a doubt"
+          >
+            <Camera size={18} aria-hidden="true" />
+          </button>
+        )}
         {streaming ? (
           <button
             type="button"
@@ -161,30 +213,34 @@ export default function AskTab({ spaceId }) {
           </button>
         )}
       </form>
-      <p className="mt-2 text-center text-xs text-ink-muted">
-        Answers come only from the files in this notebook, with the page they came from.
-      </p>
+      {!compact && (
+        <p className="mt-2 text-center text-xs text-ink-muted">
+          Answers come only from your notes, with the page they came from. Add “for 2 / 5 / 10 / 16 marks” for an
+          exam-length answer.
+        </p>
+      )}
     </div>
   );
 }
 
-function Question({ text }) {
+function Question({ message, spaceId }) {
   return (
-    <div className="flex justify-end">
-      <p className="max-w-[85%] rounded-md rounded-br-none bg-ink px-4 py-2.5 text-paper shadow-sm">{text}</p>
+    <div className="flex flex-col items-end gap-2">
+      {message.photo && <PhotoThumb spaceId={spaceId} photoId={message.photo} localUrl={message.localPhotoUrl} />}
+      <p className="max-w-[85%] rounded-md rounded-br-none bg-ink px-4 py-2.5 whitespace-pre-wrap text-paper shadow-sm">{message.content}</p>
     </div>
   );
 }
 
-function Answer({ message }) {
+function Answer({ message, onUseCloud }) {
   const notFound = message.content.startsWith(NOT_FOUND_PREFIX);
   const uniqueSources = message.citations?.filter(
     (c, i, all) => all.findIndex((x) => x.documentId === c.documentId && x.page === c.page) === i,
   );
 
   return (
-    <article className={`ruled-margin card-surface py-4 pr-5 pl-16 ${notFound ? 'opacity-90' : ''}`}>
-      <span className="absolute top-4 left-4 font-mono text-[10px] uppercase tracking-widest text-pen">Ans.</span>
+    <article aria-busy={Boolean(message.pending)} className={`ruled-margin card-surface py-4 pr-5 pl-16 ${notFound ? 'opacity-90' : ''}`}>
+      <span className="absolute top-4 left-4 font-mono text-[10px] tracking-widest text-pen uppercase">Ans.</span>
       {message.content ? (
         notFound ? (
           <p className="flex items-start gap-2 text-ink-muted">
@@ -192,19 +248,20 @@ function Answer({ message }) {
             <span>{message.content}</span>
           </p>
         ) : (
-          <AnswerText text={message.content} citations={message.citations} />
+          <Markdown text={message.content} citations={message.citations} />
         )
       ) : (
         message.pending && <ReadingDots />
       )}
       {message.pending && message.content && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-ink/60 align-middle" />}
       {message.stopped && <p className="mt-2 text-xs text-ink-muted">Stopped.</p>}
-      {message.error && <p className="mt-2 border-l-2 border-pen pl-3 text-sm text-pen">{message.error}</p>}
+      <AnswerError error={message.error} mode={message.mode} onUseCloud={onUseCloud} />
 
-      {!message.pending && uniqueSources?.length > 0 && (
+      {!message.pending && (message.provider || uniqueSources?.length > 0) && (
         <footer className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-rule pt-3 text-xs text-ink-muted">
-          <span>From your notes:</span>
-          {uniqueSources.map((c) => (
+          <ModelBadge provider={message.provider} model={message.model} />
+          {uniqueSources?.length > 0 && <span>From your notes:</span>}
+          {uniqueSources?.map((c) => (
             <span key={`${c.documentId}-${c.page}`} className="inline-flex items-center gap-1">
               <CitationSticker page={c.page} sources={[c]} />
               <span className="max-w-40 truncate">{c.originalName}</span>
@@ -234,14 +291,31 @@ function ReadingDots() {
   );
 }
 
+function StarterChips({ starters = [], onPick }) {
+  if (!starters.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {starters.map((s) => (
+        <button
+          key={s}
+          onClick={() => onPick(s)}
+          className="rounded-full border border-ink/20 bg-card px-3 py-1 text-xs text-ink hover:border-ink/50"
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EmptyAsk({ suggestions, onPick }) {
   const picks = suggestions.length ? suggestions : ['Summarise the most important definitions', 'Explain the first unit in simple words'];
   return (
     <div className="ruled ruled-margin card-surface px-6 py-10 pl-16">
       <h2 className="text-2xl font-semibold">Ask your notes.</h2>
       <p className="mt-2 max-w-lg text-ink-muted">
-        Every answer is written only from the files you uploaded, and every fact is stuck to the page it came from.
-        If your notes don't cover it, ExamLens will say so instead of guessing.
+        Every answer is written only from your notes, and every fact is stuck to the page it came from. Say how many
+        marks it's for and the answer takes that shape. Stuck on a printed problem or code? Snap a photo of it.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         {picks.map((s) => (

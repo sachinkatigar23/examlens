@@ -163,3 +163,112 @@
       0 6px 18px -10px rgb(27 42 74 / 0.18);
   }
 }
+
+/* Answers and lessons rendered from Markdown (components/Markdown.jsx). */
+@layer components {
+  .md-answer {
+    @apply space-y-3 leading-relaxed;
+    overflow-wrap: anywhere;
+  }
+  .md-answer h1,
+  .md-answer h2 {
+    @apply pt-2 font-serif text-xl font-semibold;
+  }
+  .md-answer h3,
+  .md-answer h4 {
+    @apply pt-1 font-serif text-lg font-semibold;
+  }
+  .md-answer ul {
+    @apply list-disc space-y-1.5 pl-5 marker:text-pen;
+  }
+  .md-answer ol {
+    @apply list-decimal space-y-1.5 pl-5 marker:font-mono marker:text-ink-muted;
+  }
+  .md-answer li > ul,
+  .md-answer li > ol {
+    @apply mt-1.5;
+  }
+  .md-answer strong {
+    @apply font-semibold;
+  }
+  .md-answer blockquote {
+    @apply border-l-2 border-highlight pl-3 text-ink-muted;
+  }
+  .md-answer table {
+    @apply w-full border-collapse text-sm;
+  }
+  .md-answer th,
+  .md-answer td {
+    @apply border border-rule px-2.5 py-1.5 text-left align-top;
+  }
+  .md-answer th {
+    background: color-mix(in srgb, var(--highlight) 22%, var(--card));
+    @apply font-semibold;
+  }
+  .md-answer :not(pre) > code {
+    @apply rounded-[3px] bg-ink/[0.06] px-1 py-px font-mono text-[0.88em];
+  }
+  .md-answer pre {
+    @apply overflow-x-auto rounded-md border border-rule p-3 font-mono text-[13px] leading-normal;
+    background: color-mix(in srgb, var(--paper) 70%, var(--card));
+  }
+  /* "Diagram to draw:" — a dashed box, like the space you leave for a figure on the answer sheet. */
+  .md-answer .md-diagram {
+    @apply rounded-md border-2 border-dashed border-ink/25 px-3 py-2;
+  }
+
+  /* Syntax colours (highlight.js classes), from the palette so both themes stay readable. */
+  .md-answer .hljs-keyword,
+  .md-answer .hljs-built_in,
+  .md-answer .hljs-selector-tag {
+    color: var(--pen);
+  }
+  .md-answer .hljs-string,
+  .md-answer .hljs-attr,
+  .md-answer .hljs-regexp {
+    color: color-mix(in srgb, #2f7a4f 80%, var(--ink));
+  }
+  .dark .md-answer .hljs-string,
+  .dark .md-answer .hljs-attr,
+  .dark .md-answer .hljs-regexp {
+    color: #8fcf9f;
+  }
+  .md-answer .hljs-number,
+  .md-answer .hljs-literal,
+  .md-answer .hljs-type,
+  .md-answer .hljs-title {
+    color: color-mix(in srgb, #3f63b5 85%, var(--ink));
+  }
+  .dark .md-answer .hljs-number,
+  .dark .md-answer .hljs-literal,
+  .dark .md-answer .hljs-type,
+  .dark .md-answer .hljs-title {
+    color: #9db4ee;
+  }
+  .md-answer .hljs-comment,
+  .md-answer .hljs-meta {
+    @apply text-ink-muted italic;
+  }
+}
+
+/* Print: answer booklet (pages/BookletPage.jsx) and any page printed from the browser. */
+@media print {
+  body::before,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+  .print-page {
+    max-width: none;
+    padding: 0;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+  .md-answer pre {
+    white-space: pre-wrap;
+  }
+}

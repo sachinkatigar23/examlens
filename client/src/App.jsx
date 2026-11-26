@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import SpacePage from './pages/SpacePage.jsx';
+import BookletPage from './pages/BookletPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/spaces/:spaceId" element={<SpacePage />} />
+          <Route path="/spaces/:spaceId/booklet" element={<BookletPage />} />
         </Route>
       </Route>
 

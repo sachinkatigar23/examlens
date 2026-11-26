@@ -27,7 +27,8 @@ const CHAPTERS = [
     kicker: 'Look closer',
     title: (
       <>
-        Seven of the last eight DBMS papers asked about <span className="highlighted">normalization</span>.{' '}
+        {/* From the demo data (samples/: four Computer Networks papers, 2022–2025). Keep it true to that data. */}
+        <span className="highlighted">Network models</span> came up in all 4 sample papers.{' '}
         <em className="font-normal">Now you know.</em>
       </>
     ),

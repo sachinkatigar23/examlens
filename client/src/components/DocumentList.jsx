@@ -9,6 +9,7 @@ const GROUPS = [
   { kind: 'syllabus', title: 'Syllabus', empty: 'Add the syllabus so questions can be matched to topics.' },
   { kind: 'notes', title: 'Notes', empty: 'Your class notes go here; Ask answers from them.' },
   { kind: 'paper', title: 'Past papers', empty: 'Three or more past papers make the Analyzer worth it.' },
+  { kind: 'important', title: 'Important questions', empty: "Your college's question bank PDF: every question gets an exam answer from your notes." },
 ];
 
 export default function DocumentList({ documents, onDelete, onRetry }) {
@@ -19,7 +20,7 @@ export default function DocumentList({ documents, onDelete, onRetry }) {
       {GROUPS.map((group) => {
         const docs = documents
           .filter((d) => d.kind === group.kind)
-          .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+          .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || (a.unit ?? '~').localeCompare(b.unit ?? '~'));
         return (
           <section key={group.kind} aria-labelledby={`group-${group.kind}`}>
             <h3 id={`group-${group.kind}`} className="flex items-baseline gap-3 text-lg font-semibold">
@@ -63,6 +64,7 @@ function DocumentRow({ doc, onDelete, onRetry }) {
   const [retrying, setRetrying] = useState(false);
   const meta = [
     doc.kind === 'paper' && doc.year,
+    doc.kind === 'notes' && (doc.unit ?? 'Mixed units'),
     doc.pages && plural(doc.pages, 'page'),
     formatBytes(doc.sizeBytes),
   ].filter(Boolean);
