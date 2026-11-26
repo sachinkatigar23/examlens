@@ -16,7 +16,8 @@ T = TypeVar("T", bound=BaseModel)
 class LLMError(Exception):
     """A provider failed in a way the user should hear about. `code` lets the UI react, e.g. offer Cloud when
     the local model is offline:
-      local_offline | model_missing | cloud_unavailable | rate_limited | cloud_error | vision_unavailable | bad_output
+      local_offline | model_missing | cloud_unavailable | rate_limited | cloud_busy | cloud_error | vision_unavailable
+      | bad_output | embeddings_offline
     """
 
     def __init__(self, message: str, code: str = "llm_error"):

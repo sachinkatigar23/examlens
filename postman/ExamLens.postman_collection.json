@@ -2518,7 +2518,7 @@
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
                   "const t = pm.response.text();",
-                  "if (pm.collectionVariables.get('cloudAvailable') === 'true') pm.test('cloud answer', () => pm.expect(t).to.include('\"provider\": \"cloud\"'));",
+                  "if (pm.collectionVariables.get('cloudAvailable') === 'true') pm.test('cloud answer', () => pm.expect(t).to.match(/\"provider\": ?\"cloud\"/));",
                   "else pm.test('clear cloud_unavailable error', () => pm.expect(t).to.include('cloud_unavailable'));"
                 ]
               }

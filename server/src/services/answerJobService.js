@@ -10,7 +10,7 @@ import { withFileNames } from './streamRelay.js';
 // poll it, and a restarted server resumes running jobs (answered questions are skipped, so nothing is redone).
 
 // Errors that will fail every following question too: stop the job instead of skipping question by question.
-const FATAL = new Set(['ai_down', 'local_offline', 'embeddings_offline', 'model_missing', 'cloud_unavailable', 'rate_limited', 'cloud_error']);
+const FATAL = new Set(['ai_down', 'local_offline', 'embeddings_offline', 'model_missing', 'cloud_unavailable', 'rate_limited', 'cloud_error', 'cloud_busy']);
 
 const aborts = new Map(); // jobId -> AbortController of the answer being generated
 let queue = Promise.resolve(); // jobs of different notebooks also run one after another

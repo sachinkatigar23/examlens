@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # Cloud mode (optional). No key -> Cloud is shown as unavailable, everything else works.
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
     # Optional local vision model for "Snap a doubt", e.g. qwen2.5vl:3b (slower, weaker on handwriting).
     vision_model_local: str = ""
 

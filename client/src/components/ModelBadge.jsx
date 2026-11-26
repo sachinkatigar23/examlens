@@ -1,6 +1,6 @@
 import { Cloud, HardDrive } from 'lucide-react';
 
-// "Local · qwen2.5:3b" / "Cloud · gemini-2.5-flash": which model wrote this answer.
+// "Local · qwen2.5:3b" / "Cloud · gemini-3.5-flash-lite": which model wrote this answer.
 export default function ModelBadge({ provider, model, marks }) {
   if (!provider) return null;
   const Icon = provider === 'cloud' ? Cloud : HardDrive;

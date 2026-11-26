@@ -27,7 +27,7 @@ choose it.
 - **Snap a doubt:** photograph a printed problem or a piece of code, check the transcription, and get a step-by-step
   solution that follows the method in your notes (for code: the bug and the fixed code).
 - **Local or Cloud, your choice:** every answer shows which model wrote it (`Local · qwen2.5:3b` /
-  `Cloud · gemini-2.5-flash`). Local is the default.
+  `Cloud · gemini-3.5-flash-lite`). Local is the default.
 - **Analyzer:** a topics × years heatmap of your past papers. Hot topics are ranked by how many different years
   they were asked in, then by marks. "Asked again" lists questions that appear in more than one year's paper. Click
   any cell to see the actual questions, and move a question to another topic if the match is wrong (low-confidence
@@ -164,6 +164,9 @@ Open **http://localhost:8080**. The first build takes a few minutes; later start
 `ai-service/.env` (copy `ai-service/.env.example` first): `GEMINI_API_KEY=...` and optionally `GEMINI_MODEL=...`.
 Docker reads it from that file; restart the AI service after changing it. For local photo reading, set
 `VISION_MODEL_LOCAL=qwen2.5vl:3b` and `ollama pull qwen2.5vl:3b` (slower and weaker on handwriting than Cloud).
+The default Cloud model is `gemini-3.5-flash-lite`: on the free tier each model has a small **daily** request
+limit (20/day on `gemini-3.6-flash` when tested), so use Cloud for individual answers, lessons and photos, and Local
+for "Answer all" on a whole question bank. When a limit is hit, ExamLens says which one and when it resets.
 
 **Demo data (optional).** Put PDFs in `samples/` (the folder is gitignored). File names decide what they are:
 `syllabus` in the name → syllabus, a year like `2023` → past paper of that year, anything else → notes. Then:
