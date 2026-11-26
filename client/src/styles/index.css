@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+
+/* Ink & Paper palette. Colours live in CSS variables so the dark "night study" theme is one class swap. */
+:root {
+  --paper: #f5f1e8;
+  --card: #fbf8f1;
+  --ink: #1b2a4a;
+  --ink-muted: #5b6478;
+  --pen: #d7452c;
+  --highlight: #f4d35e;
+  --rule: #e4dccb;
+  --grain-opacity: 0.35;
+}
+
+.dark {
+  --paper: #0f1626;
+  --card: #16203a;
+  --ink: #ede6d6;
+  --ink-muted: #a3a9b8;
+  --pen: #e2654f;
+  --highlight: #e5c65a;
+  --rule: #24304d;
+  --grain-opacity: 0.12;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-pen: var(--pen);
+  --color-highlight: var(--highlight);
+  --color-rule: var(--rule);
+
+  --font-serif: 'Fraunces Variable', Georgia, serif;
+  --font-sans: 'DM Sans Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    min-height: 100dvh;
+  }
+  /* Paper grain: an SVG noise texture fixed behind everything. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-serif;
+    font-variation-settings: 'SOFT' 60, 'WONK' 0;
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--pen);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--highlight);
+    color: #1b2a4a;
+  }
+}
+
+@layer components {
+  /* Faint notebook rules + red margin line. Used on "page" surfaces. */
+  .ruled {
+    background-color: var(--card);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      var(--rule) 31px,
+      var(--rule) 32px
+    );
+  }
+  .ruled-margin {
+    position: relative;
+  }
+  .ruled-margin::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 2.75rem;
+    width: 1px;
+    background: color-mix(in srgb, var(--pen) 55%, transparent);
+  }
+
+  /* A highlighter stroke behind text: slightly uneven, like a real marker. */
+  .highlighted {
+    background-image: linear-gradient(
+      100deg,
+      transparent 0.2em,
+      color-mix(in srgb, var(--highlight) 85%, transparent) 0.3em,
+      var(--highlight) 92%,
+      transparent 98%
+    );
+    background-size: 100% 0.62em;
+    background-position: 0 88%;
+    background-repeat: no-repeat;
+    /* padding lets the stroke overhang the word; the negative margin keeps text spacing unchanged */
+    padding: 0 0.12em;
+    margin: 0 -0.12em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  /* Upload "paper tray": a recessed surface with a lip at the front. */
+  .tray {
+    background: color-mix(in srgb, var(--rule) 45%, var(--paper));
+    box-shadow:
+      inset 0 3px 8px rgb(27 42 74 / 0.12),
+      inset 0 -6px 0 color-mix(in srgb, var(--rule) 90%, var(--ink) 10%);
+    border: 1px solid var(--rule);
+  }
+  .tray-active {
+    background: color-mix(in srgb, var(--highlight) 30%, var(--paper));
+  }
+
+  /* "Processing" chip: highlighter stripes slowly sliding across. */
+  .chip-processing {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--highlight) 0 8px,
+      color-mix(in srgb, var(--highlight) 60%, white) 8px 16px
+    );
+    background-size: 22.6px 22.6px;
+    animation: chip-stripes 1s linear infinite;
+  }
+  @keyframes chip-stripes {
+    to {
+      background-position: 22.6px 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip-processing,
+    .animate-spin {
+      animation: none;
+    }
+  }
+
+  .card-surface {
+    @apply rounded-md border border-rule bg-card;
+    box-shadow:
+      0 1px 0 rgb(27 42 74 / 0.04),
+      0 6px 18px -10px rgb(27 42 74 / 0.18);
+  }
+}
