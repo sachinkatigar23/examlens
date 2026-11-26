@@ -2,29 +2,48 @@
 
 > **Know what's coming. Study what matters.**
 
-ExamLens is a private, offline exam-prep app for university students. Upload your **syllabus**, your **notes** and as
-many **past papers** as you can find. ExamLens reads every question, ties it to a syllabus topic and shows you which
-topics come up year after year. Ask it a doubt and it answers **only from your own notes**, with the page number
-next to every point. Everything runs on your laptop with local models through [Ollama](https://ollama.com): free,
-and no notes ever leave the machine.
+ExamLens is a private exam tutor for university students. Upload one subject's **syllabus**, **unit notes**, **past
+papers** and the college's **"important questions"** PDF. ExamLens shows which topics come up year after year,
+**teaches each unit from scratch**, writes an **exam answer for every important question, sized to its marks**, and
+solves a **photographed doubt** step by step. Every answer comes **only from your own notes**, with the page number
+next to every point. By default everything runs on your laptop with local models through [Ollama](https://ollama.com):
+free, and no notes ever leave the machine. An optional **Cloud** mode (Google Gemini) gives stronger answers when you
+choose it.
 
 ![ExamLens landing page](docs/screenshots/landing.png)
 
 ## What it does
 
+- **Study mode:** pick a unit, see its topics (not started / lesson ready / studied ✓) and press **Teach me this
+  unit**. Each topic is taught from scratch in simple English: what it is, a real-life analogy, how it works step by
+  step, key terms, an example or code, what to draw in the exam and an exam tip, all cited to your notes. Lessons are
+  saved; a follow-up chat under each lesson is scoped to that unit.
+- **Question Bank:** upload the college's important-questions PDF and every question is sorted into its unit and
+  topic with its marks (taken from headings like "5-Marks Questions"; editable). **Exam answer** writes a
+  marks-aware answer: 2 marks = definition + example, 5 = intro + key points, 10/16 = introduction, sub-headings,
+  *diagram to draw*, example/code/table, advantages, conclusion. **Answer all** works through the bank in the
+  background (resumable), and the **answer booklet** prints to PDF. A badge shows "also asked in 2023, 2025" when a
+  past paper had the same question.
+- **Snap a doubt:** photograph a printed problem or a piece of code, check the transcription, and get a step-by-step
+  solution that follows the method in your notes (for code: the bug and the fixed code).
+- **Local or Cloud, your choice:** every answer shows which model wrote it (`Local · qwen2.5:3b` /
+  `Cloud · gemini-2.5-flash`). Local is the default.
 - **Analyzer:** a topics × years heatmap of your past papers. Hot topics are ranked by how many different years
   they were asked in, then by marks. "Asked again" lists questions that appear in more than one year's paper. Click
   any cell to see the actual questions, and move a question to another topic if the match is wrong (low-confidence
   matches are flagged for review).
-- **Ask your notes:** retrieval-augmented answers that stream in as short exam-style bullet points. Every fact
-  carries a `p. 14` sticker; hover it to see the passage it came from. If your notes don't cover the question,
-  ExamLens says so instead of guessing.
+- **Ask your notes:** retrieval-augmented answers from your **notes only**, rendered as Markdown (headings, tables,
+  highlighted code). Say "for 10 marks" and the answer takes that shape. Every fact carries a `p. 14` sticker;
+  hover it to see the passage it came from. If your notes don't cover the question, ExamLens says so instead of
+  guessing; "hi" gets a one-line hello, not a search.
 - **Documents:** drag-and-drop upload, live processing status, retry for failed files.
 - **Private by design:** local LLM and embeddings, local vector database, accounts with JWT + rotating refresh
   tokens, and every search is scoped to the notebook it belongs to.
 
 | | |
 |---|---|
+| ![Study mode](docs/screenshots/study.png) | ![Question Bank](docs/screenshots/question-bank.png) |
+| **Study:** a unit taught topic by topic | **Question Bank:** marks-aware exam answers |
 | ![Analyzer](docs/screenshots/analyzer.png) | ![Ask with page citations](docs/screenshots/ask.png) |
 | **Analyzer:** heatmap, hot topics, repeated questions | **Ask:** streamed answers with page stickers |
 | ![Documents](docs/screenshots/documents.png) | ![Dashboard](docs/screenshots/dashboard.png) |
@@ -32,8 +51,21 @@ and no notes ever leave the machine.
 | ![Night study mode](docs/screenshots/analyzer-dark.png) | ![3D landing, heatmap stage](docs/screenshots/landing-heatmap-dark.png) |
 | **Night study mode** (dark theme) | **Landing:** the 3D pile of papers becomes a heatmap |
 
-The screenshots use the demo notebook: a Computer Networks syllabus, four sets of class notes and four
-**sample papers generated for testing** (2022–2025). They are not official university papers.
+The Analyzer screenshots use the demo notebook: a Computer Networks syllabus, four sets of class notes and four
+**sample papers generated for testing** (2022–2025), not official university papers. Study and Question Bank use a
+real Artificial Intelligence subject (4 units of notes + the college question bank, no syllabus).
+
+### Local vs Cloud: what leaves your machine
+
+| | Local (default) | Cloud (optional) |
+|---|---|---|
+| Chat model | `qwen2.5:3b` in Ollama on your GPU | Google Gemini (`GEMINI_MODEL`) |
+| Sent over the internet | nothing | the question, the few note passages retrieved for it, and (Snap a doubt) the photo |
+| PDFs, indexing, search | on your machine | **still on your machine**: embeddings are always local, so switching never needs re-indexing |
+
+Cloud needs `GEMINI_API_KEY` in `ai-service/.env`; without it the toggle shows Cloud as "not set up". The
+first time you switch to Cloud, ExamLens shows this privacy note. If the local model is offline, an answer
+offers "Use Cloud for this answer?" instead of switching silently.
 
 ## Architecture
 
@@ -51,6 +83,7 @@ flowchart LR
     end
 
     O["Ollama on the host (GPU)<br/>qwen2.5:3b + nomic-embed-text"]
+    G["Google Gemini<br/>(optional Cloud mode)"]
 
     B --> C --> N
     N <-->|"internal REST<br/>X-Service-Key"| A
@@ -59,6 +92,7 @@ flowchart LR
     U -.->|read-only| A
     A --> Q
     A -->|host.docker.internal| O
+    A -.->|"Cloud mode only:<br/>question + passages"| G
 ```
 
 **Design decisions**
@@ -85,7 +119,10 @@ flowchart LR
 | **Syllabus** | Units are found by their "Unit 3 / UNIT-III / Module 3" headings. Units written as "Label: item, item." are parsed directly (exact and repeatable); other formats go to `qwen2.5:3b` with a JSON schema at temperature 0. |
 | **Past papers** | Regex extraction of numbers, sub-parts and marks (section headers like `(6 x 2 = 12)` fill in missing marks); falls back to the LLM if fewer than 5 questions are found. Each question is matched to its nearest topic. |
 | **Repeats** | Two questions are the same if they are semantically close (cosine ≥ 0.85) **and** share ≥ 60% of their content words. Embeddings alone call "half duplex" vs "full duplex" a repeat. |
-| **Ask** | Top-5 chunks from this notebook → if even the best one is weakly related, "I couldn't find this in your notes" → otherwise a grounded prompt streams the answer over SSE, with `[p. N]` citations turned into stickers. |
+| **Question bank** | "UNIT – II" and "5-Marks Questions" headings give each question its unit and marks (97/97 on the real AI bank). With no syllabus in the notebook, the LLM names 4–8 topics per unit and every question goes to its nearest name by embedding. |
+| **Units** | Notes are uploaded for a unit (or "Mixed"); every chunk is tagged with its unit and nearest topic, and re-tagged when the syllabus changes. Study lessons retrieve by unit/topic. |
+| **Answers** | Notes-only retrieval (more passages for more marks: 2→4, 5→6, 10→10, 16→12) → if even the best one is weakly related, "I couldn't find this in your notes" → otherwise a marks-shaped prompt streams the answer over SSE, with `[p. N]` citations turned into stickers. |
+| **Providers** | `llm/base.py` interface (`stream_chat`, `chat_json`, `vision`) with an Ollama and a Gemini implementation, picked per request. |
 
 All thresholds were measured on real test data, not guessed. The numbers are in [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md).
 
@@ -95,8 +132,9 @@ All thresholds were measured on real test data, not guessed. The numbers are in 
 |---|---|
 | Frontend | React 18, Vite, Tailwind CSS v4, React Router, Axios, Framer Motion, React Three Fiber (landing only), lucide-react, self-hosted Fraunces / DM Sans / JetBrains Mono |
 | API | Node 24, Express 5, Mongoose, bcrypt, jsonwebtoken, cookie-parser, multer, zod, helmet, cors, express-rate-limit, morgan |
-| AI service | Python 3.12, FastAPI, Uvicorn, Pydantic, PyMuPDF, httpx, qdrant-client |
-| Models | `qwen2.5:3b` (chat), `nomic-embed-text` (768-d embeddings) via Ollama |
+| AI service | Python 3.12, FastAPI, Uvicorn, Pydantic, PyMuPDF, httpx, qdrant-client, google-genai |
+| Models | `qwen2.5:3b` (chat), `nomic-embed-text` (768-d embeddings) via Ollama; optional Gemini (Cloud) |
+| Rendering | react-markdown + remark-gfm, highlight.js (core + 10 languages) |
 | Data | MongoDB 7, Qdrant |
 | Tooling | Docker Compose, nginx, Postman / newman, Git |
 
@@ -121,6 +159,11 @@ docker compose up -d --build
 ```
 
 Open **http://localhost:8080**. The first build takes a few minutes; later starts take about 20 seconds.
+
+**Cloud mode (optional).** Add your key from [Google AI Studio](https://aistudio.google.com/apikey) to
+`ai-service/.env` (copy `ai-service/.env.example` first): `GEMINI_API_KEY=...` and optionally `GEMINI_MODEL=...`.
+Docker reads it from that file; restart the AI service after changing it. For local photo reading, set
+`VISION_MODEL_LOCAL=qwen2.5vl:3b` and `ollama pull qwen2.5vl:3b` (slower and weaker on handwriting than Cloud).
 
 **Demo data (optional).** Put PDFs in `samples/` (the folder is gitignored). File names decide what they are:
 `syllabus` in the name → syllabus, a year like `2023` → past paper of that year, anything else → notes. Then:
@@ -170,10 +213,17 @@ Base `/api/v1`, JSON, errors as `{ "error": { "code", "message" } }`.
 | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` | JWT access token + httpOnly refresh cookie, rotated on every refresh, reuse detected |
 | `GET/POST /spaces`, `GET/PATCH/DELETE /spaces/:id` | Notebooks |
 | `POST/GET /spaces/:id/documents`, `POST …/:docId/retry`, `DELETE …/:docId` | PDF upload (202), list, retry, delete (also removes vectors) |
-| `POST /spaces/:id/ask` | Server-Sent Events: `token` … `done {citations}` |
-| `GET/DELETE /spaces/:id/messages` | Ask history |
+| `POST /spaces/:id/ask` | Server-Sent Events: `token` … `done {citations, provider, model, marks}`; body `{ question, mode, thread?, photoId? }` |
+| `GET/DELETE /spaces/:id/messages?thread=` | Chat history (`ask` or `study:<unit>`) |
 | `GET /spaces/:id/analysis` | Heatmap, hot topics, repeats (MongoDB aggregations) |
 | `GET /spaces/:id/questions?topic=&year=&confidence=low`, `PATCH …/questions/:qid` | Questions behind a cell; move a question to another topic |
+| `GET /spaces/:id/bank`, `PATCH …/questions/:qid/marks` | Question bank grouped data; correct a question's marks |
+| `GET/POST /spaces/:id/questions/:qid/answer` | Cached exam answer / write it (SSE, marks-aware, `{ mode }`) |
+| `POST /spaces/:id/bank/answer-all`, `GET/DELETE …/bank/job` | "Answer all" background job: start, progress, stop |
+| `GET /spaces/:id/answers?unit=` | Answer booklet |
+| `GET /spaces/:id/study`, `GET/POST/PATCH /spaces/:id/topics/:tid/lesson` | Units → topics with status; lesson (SSE); mark studied |
+| `POST /spaces/:id/photos`, `…/photos/:pid/transcribe`, `GET …/photos/:pid/file` | Snap a doubt |
+| `GET /ai/providers`, `PATCH /auth/me/settings` | What Local/Cloud can do right now; default mode |
 | `GET /health` | API, MongoDB and AI service status |
 
 ## Project structure
@@ -182,18 +232,24 @@ Base `/api/v1`, JSON, errors as `{ "error": { "code", "message" } }`.
 examlens/
 ├── client/        React app (pages, components, hooks, api, three/ for the 3D landing), Dockerfile + nginx.conf
 ├── server/        Express API: config, models, controllers, routes, middleware, services, validators
-├── ai-service/    FastAPI: routers (ingest, ask, rematch, documents, health) and services (pdf, chunking,
-│                  embeddings, qdrant, llm, syllabus, questions, matching, answer, ingest)
+├── ai-service/    FastAPI: routers (ingest, ask, study, rematch, documents, health) and services (pdf, chunking,
+│                  embeddings, qdrant, llm/ providers, syllabus, questions, important, matching, units,
+│                  retrieval, answer, lesson, vision, ingest)
 ├── scripts/       seed-demo.mjs
 ├── postman/       API collection + fixtures
 ├── docs/          BUILD_NOTES.md (decisions and measurements), screenshots/
 └── docker-compose.yml
 ```
 
-## Roadmap (v2)
+## Roadmap
 
-- Quiz generator from your notes
-- Weak-topic dashboard (what you've asked about vs what the papers ask)
+Next (Tier 2): **Check my answer** (estimated marks for your own written answer, with what's missing), an **exam
+countdown planner** (day-by-day plan from topic priority) and a one-page **last-night revision sheet** per unit.
+
+v2:
+
+- Quizzes and flashcards with spaced repetition
+- Voice viva practice
 - Share notebooks with classmates (viewer / editor roles)
 - OCR for scanned papers
 - Kannada and Hindi question papers

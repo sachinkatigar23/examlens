@@ -42,6 +42,26 @@
     {
       "key": "pollTries",
       "value": "0"
+    },
+    {
+      "key": "bankDocId",
+      "value": ""
+    },
+    {
+      "key": "questionId",
+      "value": ""
+    },
+    {
+      "key": "topicId",
+      "value": ""
+    },
+    {
+      "key": "photoId",
+      "value": ""
+    },
+    {
+      "key": "cloudAvailable",
+      "value": ""
     }
   ],
   "item": [
@@ -1434,6 +1454,1278 @@
                 "exec": [
                   "pm.test('status 401', () => pm.response.to.have.status(401));",
                   "pm.test('error code INVALID_SERVICE_KEY', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_SERVICE_KEY'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Phase 2",
+      "description": "Question bank, exam answers, answer-all job, Study lessons, Local/Cloud, Snap a doubt.",
+      "item": [
+        {
+          "name": "AI providers (Local / Cloud)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "providers"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('has local and cloud', () => { pm.expect(p).to.have.property('local'); pm.expect(p).to.have.property('cloud'); });",
+                  "pm.collectionVariables.set('cloudAvailable', String(Boolean(p.cloud.available)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Settings – default mode local",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultMode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('saved', () => pm.expect(pm.response.json().user.settings.defaultMode).to.eql('local'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Settings – nothing to update (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload important questions PDF (202)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "postman/fixtures/important-questions.pdf"
+                },
+                {
+                  "key": "kind",
+                  "value": "important",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 202', () => pm.response.to.have.status(202));",
+                  "const d = pm.response.json().document; pm.test('kind important', () => pm.expect(d.kind).to.eql('important'));",
+                  "pm.collectionVariables.set('bankDocId', d._id);",
+                  "pm.collectionVariables.set('pollTries', 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload notes for a unit (202)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "documents"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "postman/fixtures/sample-notes.pdf"
+                },
+                {
+                  "key": "kind",
+                  "value": "notes",
+                  "type": "text"
+                },
+                {
+                  "key": "unit",
+                  "value": "Unit 1",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 202', () => pm.response.to.have.status(202));",
+                  "pm.test('unit saved', () => pm.expect(pm.response.json().document.unit).to.eql('Unit 1'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List documents – wait for the question bank",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "documents"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const docs = pm.response.json().documents;",
+                  "const busy = docs.some(d => d.status === 'queued' || d.status === 'processing');",
+                  "const tries = Number(pm.collectionVariables.get('pollTries') || 0);",
+                  "if (busy && tries < 80) { pm.collectionVariables.set('pollTries', tries + 1); postman.setNextRequest(pm.info.requestName); }",
+                  "else pm.test('question bank is ready', () => pm.expect(docs.find(d => d._id === pm.collectionVariables.get('bankDocId')).status).to.eql('ready'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Question bank",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank"
+              ]
+            },
+            "description": "Units, topics and every important question with marks, \"also asked in\" years and whether an answer is cached."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('8 questions from the fixture', () => pm.expect(b.questions.filter(q => q.unit).length).to.be.at.least(8));",
+                  "pm.test('units from the UNIT headings', () => pm.expect(b.units.map(u => u.unit)).to.include.members(['Unit 1', 'Unit 2']));",
+                  "pm.test('marks from the group headings', () => pm.expect(b.questions.find(q => /congestion/i.test(q.text)).marks).to.eql(10));",
+                  "const two = b.questions.find(q => /routing/i.test(q.text));",
+                  "pm.collectionVariables.set('questionId', two._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set marks (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}/marks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "questions",
+                "{{questionId}}",
+                "marks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marks\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('marksEdited', () => pm.expect(pm.response.json().question.marksEdited).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set marks – out of range (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}/marks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "questions",
+                "{{questionId}}",
+                "marks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marks\": 99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exam answer (SSE, 2 marks)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "questions",
+                "{{questionId}}",
+                "answer"
+              ]
+            },
+            "description": "Marks-aware answer from the notes, streamed, then cached as an Answer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "pm.test('streams tokens then done', () => { const t = pm.response.text(); pm.expect(t).to.include('event: token'); pm.expect(t).to.include('event: done'); });",
+                  "pm.test('done says which model wrote it', () => pm.expect(pm.response.text()).to.match(/\"provider\": ?\"(local|cloud)\"/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cached exam answer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "questions",
+                "{{questionId}}",
+                "answer"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json().answer; pm.test('cached', () => pm.expect(a).to.not.eql(null)); pm.test('2 marks', () => pm.expect(a.marks).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer booklet data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/answers?unit=Unit 2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "answers"
+              ],
+              "query": [
+                {
+                  "key": "unit",
+                  "value": "Unit 2"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('only Unit 2', () => pm.expect(pm.response.json().questions.every(q => q.unit === 'Unit 2')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer all – start (202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank/answer-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank",
+                "answer-all"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\",\n  \"unit\": \"Unit 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 202', () => pm.response.to.have.status(202));",
+                  "pm.test('running', () => pm.expect(pm.response.json().job.status).to.eql('running'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer all – already running (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank/answer-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank",
+                "answer-all"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\",\n  \"unit\": \"Unit 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer all – progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank/job",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank",
+                "job"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json().job; pm.test('has progress', () => { pm.expect(j.total).to.eql(5); pm.expect(j.done).to.be.at.least(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer all – stop",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank/job",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank",
+                "job"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('cancelled', () => pm.expect(pm.response.json().job.status).to.eql('cancelled'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Answer all – nothing running (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/bank/job",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "bank",
+                "job"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Study plan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/study",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "study"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test('units with topics', () => pm.expect(s.units[0].topics.length).to.be.above(0));",
+                  "pm.test('statuses', () => pm.expect(s.units[0].topics[0].status).to.be.oneOf(['not_started', 'generated', 'studied']));",
+                  "pm.collectionVariables.set('topicId', s.units[0].topics[0]._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lesson – none yet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/topics/{{topicId}}/lesson",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "topics",
+                "{{topicId}}",
+                "lesson"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('null', () => pm.expect(pm.response.json().lesson).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark studied before a lesson exists (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/topics/{{topicId}}/lesson",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "topics",
+                "{{topicId}}",
+                "lesson"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studied\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Teach a topic (SSE lesson)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/topics/{{topicId}}/lesson",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "topics",
+                "{{topicId}}",
+                "lesson"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "pm.test('streams tokens then done', () => { const t = pm.response.text(); pm.expect(t).to.include('event: token'); pm.expect(t).to.include('event: done'); });",
+                  "pm.test('done says which model wrote it', () => pm.expect(pm.response.text()).to.match(/\"provider\": ?\"(local|cloud)\"/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark studied",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/topics/{{topicId}}/lesson",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "topics",
+                "{{topicId}}",
+                "lesson"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studied\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('studied', () => pm.expect(pm.response.json().status).to.eql('studied'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unit follow-up chat (SSE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "ask"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Explain it more simply\",\n  \"thread\": \"study:Unit 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "pm.test('streams tokens then done', () => { const t = pm.response.text(); pm.expect(t).to.include('event: token'); pm.expect(t).to.include('event: done'); });",
+                  "pm.test('done says which model wrote it', () => pm.expect(pm.response.text()).to.match(/\"provider\": ?\"(local|cloud)\"/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unit chat history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/messages?thread=study:Unit 1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "thread",
+                  "value": "study:Unit 1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('2 messages in this thread', () => pm.expect(pm.response.json().messages.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Small talk (SSE, no retrieval)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "ask"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"hi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('intro reply', () => pm.expect(pm.response.text()).to.include('ExamLens'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ask in Cloud mode",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "ask"
+              ]
+            },
+            "description": "Without GEMINI_API_KEY the stream ends with event: error, code cloud_unavailable (Cloud is unavailable, not broken).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What is a protocol?\",\n  \"mode\": \"cloud\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.text();",
+                  "if (pm.collectionVariables.get('cloudAvailable') === 'true') pm.test('cloud answer', () => pm.expect(t).to.include('\"provider\": \"cloud\"'));",
+                  "else pm.test('clear cloud_unavailable error', () => pm.expect(t).to.include('cloud_unavailable'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload a photo (201)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/photos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "photos"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "postman/fixtures/doubt.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('photoId', pm.response.json().photo._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload a PDF as a photo (415)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/photos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "photos"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "postman/fixtures/sample-notes.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 415', () => pm.response.to.have.status(415));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Photo file",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/photos/{{photoId}}/file",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "photos",
+                "{{photoId}}",
+                "file"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('png', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('image/png'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transcribe photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/photos/{{photoId}}/transcribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "photos",
+                "{{photoId}}",
+                "transcribe"
+              ]
+            },
+            "description": "Local needs VISION_MODEL_LOCAL (else 503 VISION_UNAVAILABLE with a clear message); Cloud needs GEMINI_API_KEY.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('text, or a clear vision-unavailable error', () => {",
+                  "  if (pm.response.code === 200) pm.expect(pm.response.json().text).to.be.a('string');",
+                  "  else { pm.expect(pm.response.code).to.eql(503); pm.expect(pm.response.json().error.code).to.eql('VISION_UNAVAILABLE'); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solve the photo (SSE, doubt)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/ask",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "ask"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Find the bug: queue.pop() in a BFS loop\",\n  \"photoId\": \"{{photoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "pm.test('streams tokens then done', () => { const t = pm.response.text(); pm.expect(t).to.include('event: token'); pm.expect(t).to.include('event: done'); });",
+                  "pm.test('done says which model wrote it', () => pm.expect(pm.response.text()).to.match(/\"provider\": ?\"(local|cloud)\"/));"
                 ]
               }
             }

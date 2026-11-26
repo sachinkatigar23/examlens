@@ -40,6 +40,11 @@ services:
     container_name: examlens-ai
     restart: unless-stopped
     # Not published: only the server talks to it (X-Service-Key).
+    # Optional Cloud mode: GEMINI_API_KEY / GEMINI_MODEL / VISION_MODEL_LOCAL are read from ai-service/.env
+    # (the only place the key lives). The values under `environment` below win over that file.
+    env_file:
+      - path: ./ai-service/.env
+        required: false
     environment:
       SERVICE_KEY: ${SERVICE_KEY:?set SERVICE_KEY in .env}
       NODE_API_URL: http://server:5000
