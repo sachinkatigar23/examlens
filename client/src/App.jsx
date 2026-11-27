@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import SpacePage from './pages/SpacePage.jsx';
 import BookletPage from './pages/BookletPage.jsx';
+import RevisionPage from './pages/RevisionPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/spaces/:spaceId" element={<SpacePage />} />
           <Route path="/spaces/:spaceId/booklet" element={<BookletPage />} />
+          <Route path="/spaces/:spaceId/revision/:unit" element={<RevisionPage />} />
         </Route>
       </Route>
 

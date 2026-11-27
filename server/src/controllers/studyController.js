@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Document } from '../models/Document.js';
 import { Lesson } from '../models/Lesson.js';
+import { StudyPlan } from '../models/StudyPlan.js';
 import { Topic } from '../models/Topic.js';
 import { relayAiStream } from '../services/streamRelay.js';
 import { notFound } from '../utils/AppError.js';
@@ -19,11 +20,13 @@ const statusOf = (lesson) => (!lesson ? 'not_started' : lesson.studied ? 'studie
 // (not_started | generated | studied), plus how many notes files were tagged with the unit.
 export async function getStudyPlan(req, res) {
   const space = req.space._id;
-  const [topics, lessons, notes] = await Promise.all([
+  const [topics, lessons, notes, plan] = await Promise.all([
     Topic.find({ space }).sort({ order: 1 }).lean(),
     Lesson.find({ space }).select('topic studied provider model updatedAt').lean(),
     Document.find({ space, kind: 'notes' }).select('unit status').lean(),
+    StudyPlan.findOne({ space }).select('studiedTopics').lean(),
   ]);
+  const tickedInPlan = new Set((plan?.studiedTopics ?? []).map(String)); // ticked in the exam countdown
   const lessonOf = new Map(lessons.map((l) => [String(l.topic), l]));
 
   const units = [];
@@ -34,7 +37,8 @@ export async function getStudyPlan(req, res) {
       units.push(unit);
     }
     const lesson = lessonOf.get(String(t._id));
-    unit.topics.push({ _id: t._id, name: t.name, details: t.details, derived: t.derived, status: statusOf(lesson) });
+    const status = tickedInPlan.has(String(t._id)) ? 'studied' : statusOf(lesson);
+    unit.topics.push({ _id: t._id, name: t.name, details: t.details, derived: t.derived, status });
   }
   res.json({ units, mixedNotes: notes.filter((n) => !n.unit).length });
 }

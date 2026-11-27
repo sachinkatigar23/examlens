@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BookOpen, Check, CircleDashed, GraduationCap, RefreshCw, Square } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { BookOpen, Check, CircleDashed, GraduationCap, Printer, RefreshCw, Square } from 'lucide-react';
 import Markdown from './Markdown.jsx';
 import ModeToggle from './ModeToggle.jsx';
 import ModelBadge from './ModelBadge.jsx';
@@ -8,6 +9,7 @@ import AnswerError from './AnswerError.jsx';
 import AskTab from './AskTab.jsx';
 import Button from './Button.jsx';
 import FormError from './FormError.jsx';
+import PlanPanel from './PlanPanel.jsx';
 import { getLesson, getStudyPlan, setStudied, streamLesson } from '../api/study.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
@@ -30,6 +32,7 @@ export default function StudyTab({ spaceId }) {
   const [lessonError, setLessonError] = useState(null);
   const [teaching, setTeaching] = useState(null); // { done, total } during "Teach me this unit"
   const [mode, setMode] = useModeState();
+  const [planKey, setPlanKey] = useState(0); // bumped when a topic is ticked here, so the countdown re-reads
   const abortRef = useRef(null);
   const stopRef = useRef(false);
 
@@ -109,6 +112,7 @@ export default function StudyTab({ spaceId }) {
       const studied = topic.status !== 'studied';
       const { status, lesson } = await setStudied(spaceId, topic._id, studied);
       setTopicStatus(topic._id, status);
+      setPlanKey((k) => k + 1);
       setLessons((all) => ({ ...all, [topic._id]: lesson }));
     } catch (err) {
       setError(errorMessage(err));
@@ -123,6 +127,13 @@ export default function StudyTab({ spaceId }) {
   const lesson = topic ? lessons[topic._id] : undefined;
 
   return (
+    <>
+    <PlanPanel
+      spaceId={spaceId}
+      refreshKey={planKey}
+      onChanged={loadPlan}
+      onOpenTopic={(id, u) => !busy && (setUnitName(u), setTopicId(id))}
+    />
     <div className="grid gap-8 lg:grid-cols-[17rem_1fr] lg:items-start">
       {/* Units, like the index of a notebook */}
       <nav aria-label="Units" className="space-y-2 lg:sticky lg:top-6">
@@ -156,6 +167,12 @@ export default function StudyTab({ spaceId }) {
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="mr-auto text-2xl font-semibold">{unit.unitTitle || unit.unit}</h3>
           <ModeToggle mode={mode} onChange={setMode} />
+          <Link
+            to={`/spaces/${spaceId}/revision/${encodeURIComponent(unit.unit)}`}
+            className="inline-flex items-center gap-2 rounded-md border border-ink/25 bg-card px-4 py-2.5 text-sm font-medium text-ink hover:border-ink/50"
+          >
+            <Printer size={16} aria-hidden="true" /> Last-night sheet
+          </Link>
           {teaching ? (
             <Button variant="secondary" onClick={stop}>
               <Square size={14} aria-hidden="true" /> Stop ({teaching.done}/{teaching.total})
@@ -272,6 +289,7 @@ export default function StudyTab({ spaceId }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 

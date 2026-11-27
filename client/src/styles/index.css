@@ -271,4 +271,24 @@
   .md-answer pre {
     white-space: pre-wrap;
   }
+  /* Last-night revision sheet: aim for one printed page. */
+  .revision-sheet {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .revision-sheet h1 {
+    font-size: 20px;
+  }
+  .revision-sheet .md-answer h2 {
+    font-size: 13px;
+    margin-top: 0.6em;
+    margin-bottom: 0.2em;
+  }
+  .revision-sheet .md-answer ul,
+  .revision-sheet .md-answer ol {
+    margin-top: 0.15em;
+  }
+  .revision-sheet .md-answer li + li {
+    margin-top: 0.1em;
+  }
 }

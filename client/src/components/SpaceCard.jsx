@@ -25,11 +25,31 @@ export default function SpaceCard({ space }) {
             {space.name}
           </h3>
           {space.subject && <p className="mt-1 text-sm text-ink-muted">{space.subject}</p>}
+          {space.plan && <PlanLine plan={space.plan} subject={space.subject || space.name} />}
           <p className="mt-auto pt-6 font-mono text-xs text-ink-muted">
             {plural(space.documentCount ?? 0, 'file')} · updated {formatDate(space.updatedAt)}
           </p>
         </div>
       </Link>
     </motion.li>
+  );
+}
+
+// "4 days to the AI exam · today: Unit 2 – Search algorithms"
+function PlanLine({ plan, subject }) {
+  const { daysLeft } = plan;
+  const when = daysLeft > 1 ? `${daysLeft} days to the ${subject} exam` : daysLeft === 1 ? `${subject} exam tomorrow` : daysLeft === 0 ? `${subject} exam today` : null;
+  if (!when) return null;
+  const todo = plan.today.filter((i) => !i.done);
+  return (
+    <p className="mt-3 text-sm leading-snug">
+      <span className="font-medium text-pen">{when}</span>
+      {plan.today.length > 0 && (
+        <span className="text-ink-muted">
+          {' · today: '}
+          {todo.length ? todo.slice(0, 2).map((i) => i.label).join(', ') + (todo.length > 2 ? ` +${todo.length - 2}` : '') : 'all done ✓'}
+        </span>
+      )}
+    </p>
   );
 }

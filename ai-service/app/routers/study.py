@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.deps import require_service_key
-from app.schemas import CheckRequest, LessonRequest, RetagRequest, TranscribeRequest
+from app.schemas import CheckRequest, LessonRequest, RetagRequest, RevisionRequest, TranscribeRequest
 from app.services.check import check_stream
 from app.services.lesson import lesson_stream
+from app.services.revision import sheet_stream
 from app.services.llm import LLMError
 from app.services.units import retag_document
 from app.services.vision import transcribe
@@ -23,6 +24,12 @@ async def lesson(req: LessonRequest):
 async def check_answer(req: CheckRequest):
     """Check my answer: `grade` event (estimated marks, covered, missing), then the improved version streamed."""
     return StreamingResponse(check_stream(req), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
+@router.post("/revision-sheet")
+async def revision_sheet(req: RevisionRequest):
+    """Last-night revision sheet for one unit, streamed like /lesson."""
+    return StreamingResponse(sheet_stream(req), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @router.post("/transcribe")

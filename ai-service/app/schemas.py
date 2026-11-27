@@ -98,6 +98,15 @@ class CheckRequest(BaseModel):
     mode: Mode = "local"
 
 
+class RevisionRequest(BaseModel):
+    """Last-night revision sheet for one unit."""
+    space_id: str
+    unit: str = Field(min_length=1, max_length=40)
+    unit_title: str = ""
+    topics: list[str] = Field(min_length=1, max_length=40)
+    mode: Mode = "local"
+
+
 class RetagDocument(BaseModel):
     document_id: str
     unit: str | None = None

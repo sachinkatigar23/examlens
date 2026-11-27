@@ -6,6 +6,9 @@ import * as bank from '../controllers/bankController.js';
 import * as study from '../controllers/studyController.js';
 import * as photos from '../controllers/photoController.js';
 import * as checks from '../controllers/checkController.js';
+import * as plans from '../controllers/planController.js';
+import * as revision from '../controllers/revisionController.js';
+import { examDateSchema, tickSchema } from '../validators/plan.schemas.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireSpaceOwner } from '../middleware/requireSpaceOwner.js';
 import { validate } from '../middleware/validate.js';
@@ -68,6 +71,16 @@ router.post('/:spaceId/checks', requireSpaceOwner, askLimiter, validate(checkSch
 router.get('/:spaceId/checks', requireSpaceOwner, checks.listChecks);
 router.get('/:spaceId/checks/:checkId', requireSpaceOwner, checks.getCheck);
 router.delete('/:spaceId/checks/:checkId', requireSpaceOwner, checks.deleteCheck);
+
+// Exam countdown planner
+router.get('/:spaceId/plan', requireSpaceOwner, plans.getPlan);
+router.put('/:spaceId/plan', requireSpaceOwner, validate(examDateSchema), plans.setExamDate);
+router.delete('/:spaceId/plan', requireSpaceOwner, plans.deletePlan);
+router.patch('/:spaceId/plan/items/:itemId', requireSpaceOwner, validate(tickSchema), plans.tickItem);
+
+// Last-night revision sheet, one per unit (":unit" is URL-encoded, e.g. Unit%202)
+router.get('/:spaceId/revision/:unit', requireSpaceOwner, revision.getSheet);
+router.post('/:spaceId/revision/:unit', requireSpaceOwner, askLimiter, validate(generateSchema), revision.generateSheet);
 
 // Study mode
 router.get('/:spaceId/study', requireSpaceOwner, study.getStudyPlan);

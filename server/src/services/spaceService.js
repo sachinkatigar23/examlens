@@ -8,6 +8,8 @@ import { Job } from '../models/Job.js';
 import { Lesson } from '../models/Lesson.js';
 import { Message } from '../models/Message.js';
 import { Photo } from '../models/Photo.js';
+import { StudyPlan } from '../models/StudyPlan.js';
+import { RevisionSheet } from '../models/RevisionSheet.js';
 import { Question } from '../models/Question.js';
 import { Topic } from '../models/Topic.js';
 import { removeDocument } from './documentService.js';
@@ -23,7 +25,7 @@ export async function deleteSpaceCascade(space) {
   await Promise.all(photos.map((p) => fs.unlink(path.join(env.uploadDir, 'images', p.storedName)).catch(() => {})));
 
   await Promise.all(
-    [Message, Question, Topic, Answer, AnswerCheck, Lesson, Job, Photo].map((Model) => Model.deleteMany({ space: spaceId })),
+    [Message, Question, Topic, Answer, AnswerCheck, Lesson, Job, Photo, StudyPlan, RevisionSheet].map((Model) => Model.deleteMany({ space: spaceId })),
   );
   await space.deleteOne();
 }
