@@ -15,7 +15,8 @@ export async function withFileNames(citations = []) {
 // Relays an AI-service SSE stream (/ask or /lesson) to the browser token by token, then lets the caller save
 // the result. Used by Ask, exam answers and Study lessons.
 //   onStart()                               runs once the AI stream is open (e.g. save the user's question)
-//   onFinish({ text, meta, citations, complete })  saves the result; returns extra fields for the "done" event
+//   onFinish({ text, meta, citations, complete, events })  saves the result; returns extra fields for "done"
+//                                           (events = other events the AI sent, e.g. "grade" in Check my answer)
 //   keepGoing: true = finish and save even if the browser leaves (a lesson is worth keeping)
 export async function relayAiStream(req, res, { path, body, onStart, onFinish, keepGoing = false }) {
   const upstreamAbort = new AbortController();
@@ -35,6 +36,7 @@ export async function relayAiStream(req, res, { path, body, onStart, onFinish, k
   let text = '';
   let meta = null;
   let error = null;
+  const events = {};
   try {
     for await (const { event, data } of readSse(upstream.body)) {
       if (event === 'token') {
@@ -42,6 +44,10 @@ export async function relayAiStream(req, res, { path, body, onStart, onFinish, k
         send('token', { text: data.text });
       } else if (event === 'done') meta = data;
       else if (event === 'error') error = { message: data.message, code: data.code ?? null };
+      else {
+        events[event] = data; // passed on as they come, e.g. the grade before the improved answer
+        send(event, data);
+      }
     }
   } catch (err) {
     if (!upstreamAbort.signal.aborted) {
@@ -56,7 +62,7 @@ export async function relayAiStream(req, res, { path, body, onStart, onFinish, k
   const citations = meta ? await withFileNames(meta.citations) : [];
   const complete = Boolean(meta) && !error;
   // Save whatever was produced; the caller decides whether a partial text is worth keeping.
-  const extra = text.trim() ? await onFinish({ text, meta, citations, complete }) : null;
+  const extra = text.trim() ? await onFinish({ text, meta, citations, complete, events }) : null;
 
   if (complete) send('done', { ...meta, citations, ...extra });
   else if (error) send('error', error);

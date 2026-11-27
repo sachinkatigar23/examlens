@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, ChevronDown, Printer, Square } from 'lucide-react';
+import { Check, ChevronDown, PenLine, Printer, Square } from 'lucide-react';
 import ExamAnswer from './ExamAnswer.jsx';
 import ModeToggle from './ModeToggle.jsx';
 import FormError from './FormError.jsx';
@@ -233,6 +233,13 @@ function QuestionRow({ spaceId, question, mode, onChange }) {
             Exam answer
             <ChevronDown size={12} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
+          <Link
+            to={`?tab=check&question=${q._id}`}
+            className="inline-flex items-center gap-1 rounded-md border border-ink/20 px-2 py-1 text-xs font-medium text-ink hover:border-ink/50"
+            title="Write your own answer and get an estimated mark"
+          >
+            <PenLine size={12} aria-hidden="true" /> Check my answer
+          </Link>
         </div>
       </div>
       {open && (

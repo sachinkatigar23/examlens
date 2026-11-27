@@ -70,9 +70,9 @@ export async function getProviders() {
   }
 }
 
-// filePath: "images/<uuid>.jpg" → { text, provider, model }. Vision can be slow (local models: minutes).
-export function transcribePhoto(filePath, mode) {
-  return callAi('POST', '/transcribe', { file_path: filePath, mode }, 600_000);
+// filePath: "images/<uuid>.jpg" → { text, provider, model }. purpose: 'doubt' | 'answer' (a written answer). Vision can be slow (local models: minutes).
+export function transcribePhoto(filePath, mode, purpose = 'doubt') {
+  return callAi('POST', '/transcribe', { file_path: filePath, mode, purpose }, 600_000);
 }
 
 // Opens an SSE stream (/ask, /lesson). Returns the fetch Response; the caller reads response.body.

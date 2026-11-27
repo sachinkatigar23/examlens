@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../config/env.js';
 import { Answer } from '../models/Answer.js';
+import { AnswerCheck } from '../models/AnswerCheck.js';
 import { Document } from '../models/Document.js';
 import { Job } from '../models/Job.js';
 import { Lesson } from '../models/Lesson.js';
@@ -22,7 +23,7 @@ export async function deleteSpaceCascade(space) {
   await Promise.all(photos.map((p) => fs.unlink(path.join(env.uploadDir, 'images', p.storedName)).catch(() => {})));
 
   await Promise.all(
-    [Message, Question, Topic, Answer, Lesson, Job, Photo].map((Model) => Model.deleteMany({ space: spaceId })),
+    [Message, Question, Topic, Answer, AnswerCheck, Lesson, Job, Photo].map((Model) => Model.deleteMany({ space: spaceId })),
   );
   await space.deleteOne();
 }

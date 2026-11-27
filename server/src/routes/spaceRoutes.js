@@ -5,6 +5,7 @@ import * as analysis from '../controllers/analysisController.js';
 import * as bank from '../controllers/bankController.js';
 import * as study from '../controllers/studyController.js';
 import * as photos from '../controllers/photoController.js';
+import * as checks from '../controllers/checkController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireSpaceOwner } from '../middleware/requireSpaceOwner.js';
 import { validate } from '../middleware/validate.js';
@@ -14,6 +15,7 @@ import { createSpaceSchema, updateSpaceSchema } from '../validators/space.schema
 import {
   answerAllSchema,
   askSchema,
+  checkSchema,
   generateSchema,
   lessonStatusSchema,
   marksSchema,
@@ -60,6 +62,12 @@ router.get('/:spaceId/answers', requireSpaceOwner, bank.listAnswers);
 router.patch('/:spaceId/questions/:questionId/marks', requireSpaceOwner, validate(marksSchema), bank.setMarks);
 router.get('/:spaceId/questions/:questionId/answer', requireSpaceOwner, bank.getAnswer);
 router.post('/:spaceId/questions/:questionId/answer', requireSpaceOwner, askLimiter, validate(generateSchema), bank.generateAnswer);
+
+// Check my answer (SSE: grade → improved version) + the attempts so far
+router.post('/:spaceId/checks', requireSpaceOwner, askLimiter, validate(checkSchema), checks.checkAnswer);
+router.get('/:spaceId/checks', requireSpaceOwner, checks.listChecks);
+router.get('/:spaceId/checks/:checkId', requireSpaceOwner, checks.getCheck);
+router.delete('/:spaceId/checks/:checkId', requireSpaceOwner, checks.deleteCheck);
 
 // Study mode
 router.get('/:spaceId/study', requireSpaceOwner, study.getStudyPlan);

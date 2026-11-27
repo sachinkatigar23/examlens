@@ -29,4 +29,20 @@ export const answerAllSchema = z.object({
 
 export const lessonStatusSchema = z.object({ studied: z.boolean() });
 
-export const transcribeSchema = z.object({ mode: modeSchema });
+export const transcribeSchema = z.object({
+  mode: modeSchema,
+  // doubt = a question/code to solve · answer = the student's own handwritten answer (Check my answer)
+  purpose: z.enum(['doubt', 'answer']).default('doubt'),
+});
+
+const objectId = z.string().regex(/^[a-f0-9]{24}$/, 'Invalid id');
+
+// Check my answer: a stored question (questionId) or a typed one (question + marks).
+export const checkSchema = z.object({
+  questionId: objectId.optional(),
+  question: z.string().trim().min(5, 'Type the question').max(4000).optional(),
+  marks: marks.optional(),
+  answer: z.string().trim().min(10, 'Write (or photograph) your answer first').max(12000, 'Keep the answer under 12000 characters'),
+  photoId: objectId.optional(),
+  mode: modeSchema,
+});

@@ -40,7 +40,7 @@ export async function getPhotoFile(req, res) {
 // POST /spaces/:spaceId/photos/:photoId/transcribe { mode } → { text, provider, model }
 export async function transcribe(req, res) {
   const photo = await findPhoto(req);
-  const result = await transcribePhoto(`images/${photo.storedName}`, req.body.mode);
+  const result = await transcribePhoto(`images/${photo.storedName}`, req.body.mode, req.body.purpose);
   photo.transcription = result.text;
   await photo.save();
   res.json(result);

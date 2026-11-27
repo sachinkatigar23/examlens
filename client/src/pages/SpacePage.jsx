@@ -8,6 +8,7 @@ import AskTab from '../components/AskTab.jsx';
 import AnalyzerTab from '../components/AnalyzerTab.jsx';
 import StudyTab from '../components/StudyTab.jsx';
 import QuestionBankTab from '../components/QuestionBankTab.jsx';
+import CheckTab from '../components/CheckTab.jsx';
 import SpaceFormDialog from '../components/SpaceFormDialog.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import Button from '../components/Button.jsx';
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'study', label: 'Study' },
   { id: 'ask', label: 'Ask' },
   { id: 'bank', label: 'Question Bank' },
+  { id: 'check', label: 'Check my answer' },
   { id: 'analyzer', label: 'Analyzer' },
 ];
 
@@ -108,6 +110,9 @@ export default function SpacePage() {
         )}
         {visited.has('bank') && (
           <div hidden={tab !== 'bank'}><QuestionBankTab spaceId={space._id} /></div>
+        )}
+        {visited.has('check') && (
+          <div hidden={tab !== 'check'}><CheckTab spaceId={space._id} /></div>
         )}
         {/* The analyzer re-mounts on every visit so it shows papers processed since. */}
         {tab === 'analyzer' && <AnalyzerTab spaceId={space._id} />}

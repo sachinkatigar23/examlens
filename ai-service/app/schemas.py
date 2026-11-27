@@ -85,6 +85,17 @@ class LessonRequest(BaseModel):
 class TranscribeRequest(BaseModel):
     file_path: str  # "images/<uuid>.jpg", relative to UPLOAD_DIR
     mode: Mode = "local"
+    # doubt = a question/code to solve (Snap a doubt) · answer = the student's own written answer (Check my answer)
+    purpose: Literal["doubt", "answer"] = "doubt"
+
+
+class CheckRequest(BaseModel):
+    """Check my answer: grade the student's answer against the notes and the marks format."""
+    space_id: str
+    question: str = Field(min_length=2, max_length=4000)
+    marks: int = Field(ge=1, le=30)
+    student_answer: str = Field(min_length=1, max_length=12000)
+    mode: Mode = "local"
 
 
 class RetagDocument(BaseModel):

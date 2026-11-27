@@ -60,7 +60,9 @@ class OllamaProvider(LLMProvider):
             "stream": False,
             "format": schema.model_json_schema(),
             # Extraction (syllabus topics, questions) must be repeatable: temperature 0 + a fixed seed.
-            "options": {"temperature": 0, "seed": 42, "num_ctx": EXTRACT_CONTEXT,
+            # Grading a long answer against note excerpts needs the bigger window (~3 characters per token).
+            "options": {"temperature": 0, "seed": 42,
+                        "num_ctx": EXTRACT_CONTEXT if len(system) + len(user) < 3 * EXTRACT_CONTEXT - 2000 else ANSWER_CONTEXT,
                         **({"num_predict": max_tokens} if max_tokens else {})},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
