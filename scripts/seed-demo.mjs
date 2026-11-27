@@ -22,7 +22,7 @@ const DEMO_DIR = path.resolve(ROOT, process.env.DEMO_DIR || 'demo-data');
 const EMAIL = process.env.DEMO_EMAIL || 'demo@examlens.local';
 const PASSWORD = process.env.DEMO_PASSWORD || 'examlens-demo';
 const SPACE = { name: process.env.DEMO_SPACE || 'Computer Networks – Sem 3', subject: 'Computer Networks', color: '#2C6E7F' };
-const QUESTION = process.env.DEMO_QUESTION || 'Explain the leaky bucket algorithm';
+const QUESTION = process.env.DEMO_QUESTION || 'Explain the TCP three-way handshake';
 const RESET = process.argv.includes('--reset');
 const WAIT_MINUTES = 15;
 

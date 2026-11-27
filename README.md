@@ -69,9 +69,10 @@ choose it.
 | ![Night study mode](docs/screenshots/analyzer-dark.png) | ![3D landing, heatmap stage](docs/screenshots/landing-heatmap-dark.png) |
 | **Night study mode** (dark theme) | **Landing:** the 3D pile of papers becomes a heatmap |
 
-The Analyzer screenshots use the demo notebook: a Computer Networks syllabus, four sets of class notes and four
-**sample papers generated for testing** (2022–2025), not official university papers. Study and Question Bank use a
-real Artificial Intelligence subject (4 units of notes + the college question bank, no syllabus).
+The Analyzer screenshots use the Computer Networks demo set in [demo-data/](demo-data/): a sample syllabus and four
+**model papers generated for testing** (2022–2025), not official university papers. Study and Question Bank were
+taken on a real Artificial Intelligence subject (4 units of notes + a question bank, no syllabus); that material is
+not in the repo.
 
 ### Local vs Cloud: what leaves your machine
 
@@ -164,23 +165,30 @@ All thresholds were measured on real test data, not guessed. The numbers are in 
 
 ### Requirements
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Ollama](https://ollama.com) running on the host, with both models:
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2 on Linux)
+- [Ollama](https://ollama.com) running on the host, with both models (about 2.3 GB):
   ```bash
   ollama pull qwen2.5:3b
   ollama pull nomic-embed-text
   ```
+  An NVIDIA GPU with 4 GB is enough (built on an RTX 3050 laptop); CPU-only works but answers are much slower.
+  **Linux:** Ollama listens on 127.0.0.1 by default, which containers can't reach. Start it with
+  `OLLAMA_HOST=0.0.0.0 ollama serve` (or set that in its systemd service).
+- For development without Docker for the apps: Node 20+ (24 used) and Python 3.12.
 
 ### With Docker (recommended)
 
 ```bash
-git clone <this repo> && cd examlens
-cp .env.example .env        # then replace the three secrets, e.g. with:
-                            # node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+git clone https://github.com/sachinkatigar23/examlens.git && cd examlens
+cp .env.example .env        # then replace the three change-me secrets with long random values, e.g. from:
+                            #   openssl rand -hex 48
+                            #   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 docker compose up -d --build
 ```
 
-Open **http://localhost:8080**. The first build takes a few minutes; later starts take about 20 seconds.
+Open **http://localhost:8080** and register an account (or load the demo data below). The first build takes a few
+minutes; later starts take about 20 seconds. `curl http://localhost:8080/api/v1/health` shows whether MongoDB,
+Qdrant, Ollama and both models are reachable.
 
 **Cloud mode (optional).** Add your key from [Google AI Studio](https://aistudio.google.com/apikey) to
 `ai-service/.env` (copy `ai-service/.env.example` first): `GEMINI_API_KEY=...` and optionally `GEMINI_MODEL=...`.
@@ -192,8 +200,6 @@ for "Answer all" on a whole question bank. When a limit is hit, ExamLens says wh
 
 **Uploaded files** live in `./storage/uploads` (a bind mount), the same folder dev mode uses, so a file uploaded in
 either mode works in both. (On Linux, make the folder writable by uid 1000: `sudo chown -R 1000 storage/uploads`.)
-Older installs kept uploads in a Docker volume; they were copied over, and the volume can be removed with
-`docker volume rm examlens_uploads`.
 
 **Demo data (optional).** [demo-data/](demo-data/) holds a shareable Computer Networks set: a sample syllabus, four
 generated model papers (2022–2025), short notes for each unit and an important-questions list. Load it with:
@@ -202,9 +208,10 @@ generated model papers (2022–2025), short notes for each unit and an important
 docker compose --profile demo run --rm seed
 ```
 
-This creates **demo@examlens.local / examlens-demo**, uploads everything, waits until it's processed (about 5
-minutes on a laptop GPU) and asks one example question. Running it again skips files that are already uploaded
-(`--reset` starts the notebook over). To load your own PDFs instead, put them in `samples/` (gitignored) and add
+This creates **demo@examlens.local / examlens-demo**, uploads everything, waits until it's processed (about 20
+seconds on a laptop GPU) and asks one example question. Running it again skips files that are already uploaded. To
+start the demo notebook over: `docker compose --profile demo run --rm seed node scripts/seed-demo.mjs --reset`.
+To load your own PDFs instead, put them in `samples/` (gitignored) and add
 `DEMO_DIR=samples` to `.env`. File names decide what they are: `syllabus` → syllabus, `important` → question bank,
 a year like `2023` → past paper of that year, anything else → notes (`unit3` in the name → Unit 3).
 
@@ -213,16 +220,25 @@ inside the Docker network.
 
 ### For development (hot reload)
 
+One terminal per app, each starting in the repo root. In `server/.env` and `ai-service/.env`, set the same
+`SERVICE_KEY` and replace the JWT secrets.
+
 ```bash
-docker compose up -d mongo qdrant                       # databases only
+docker compose up -d mongo qdrant        # databases only
 
-cd server && cp .env.example .env && npm install && npm run dev       # API → http://localhost:5000/api/v1
-cd ai-service && cp .env.example .env                                  # SERVICE_KEY must match server/.env
-python -m venv .venv && .venv/Scripts/pip install -r requirements.txt  # macOS/Linux: .venv/bin/pip
-.venv/Scripts/python -m uvicorn app.main:app --port 8000               # AI service → http://localhost:8000
-cd client && cp .env.example .env && npm install && npm run dev        # app → http://localhost:5173
+# terminal 1: API → http://localhost:5000/api/v1
+cd server && cp .env.example .env && npm install && npm run dev
 
-node scripts/seed-demo.mjs                                             # optional demo data (dev API)
+# terminal 2: AI service → http://localhost:8000   (macOS/Linux: .venv/bin/... instead of .venv/Scripts/...)
+cd ai-service && cp .env.example .env
+python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+
+# terminal 3: app → http://localhost:5173
+cd client && cp .env.example .env && npm install && npm run dev
+
+# optional, once all three run: demo data through the dev API
+node scripts/seed-demo.mjs
 ```
 
 Use either the full Docker stack or the dev servers at one time: both use the same MongoDB and Qdrant.
