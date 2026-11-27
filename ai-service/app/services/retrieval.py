@@ -38,9 +38,64 @@ def context_block(hits) -> str:
     return "\n\n".join(f"Excerpt {i} [p. {h.payload['page']}]:\n{h.payload['text']}" for i, h in enumerate(hits, 1))
 
 
+_WORD = re.compile(r"[a-z0-9]{3,}")
+_STOP = set("the and for with that this are was were from into its their them they which what when where how "
+            "can has have had not but also than then there these those such each other use used using".split())
+# A line needs this many words before it is a "fact" worth a citation, and must share this many content words
+# with an excerpt before that excerpt's page is put on it.
+CITE_MIN_WORDS = 8
+CITE_MIN_SHARED = 3
+
+
+def _content(text: str) -> set[str]:
+    return {w for w in _WORD.findall(text.lower()) if w not in _STOP}
+
+
+UNLINKED = ("*ExamLens couldn't link this answer to a page of your notes, so it may come from the model's general "
+            "knowledge. Check it against your notes or textbook.*")
+
+
+def ensure_citations(answer: str, hits) -> str:
+    """Every answer from the notes must show its pages, and only real ones.
+    1. A citation of a page that wasn't among the excerpts is invented: it is removed.
+    2. Each paragraph or bullet without a citation gets the page of the excerpt it shares most words with
+       (a small model sometimes cites nothing: measured 1 of 2 five-mark answers). Code blocks, headings,
+       table rows and short lines are left alone.
+    3. If no line could be linked to any excerpt, the answer says so instead of showing unrelated pages.
+    Returns the answer unchanged when it already cites every substantial line correctly."""
+    if not hits or not answer.strip():
+        return answer
+    real_pages = {h.payload["page"] for h in hits}
+    answer = CITE.sub(lambda m: m.group(0) if int(m.group(1)) in real_pages else "", answer)
+    answer = re.sub(r"[ \t]+(?=\n|$)", "", answer)  # the space a removed citation leaves at a line end
+    excerpts = [(h.payload["page"], _content(h.payload["text"])) for h in hits]
+    lines, in_code = answer.split("\n"), False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code or stripped.startswith(("#", "|")) or CITE.search(line) or len(stripped.split()) < CITE_MIN_WORDS:
+            continue
+        words = _content(stripped)
+        shared, page = max(((len(words & ex), page) for page, ex in excerpts), key=lambda x: x[0])
+        if shared >= CITE_MIN_SHARED:
+            lines[i] = f"{line.rstrip()} [p. {page}]"
+    fixed = "\n".join(lines)
+    if not CITE.search(fixed):
+        fixed = f"{fixed.rstrip()}\n\n{UNLINKED}"
+    return fixed
+
+
+def is_unlinked(answer: str) -> bool:
+    return UNLINKED in answer
+
+
 def citations(hits, answer: str) -> list[dict]:
     """One citation per (document, page). If the answer cites pages, keep only those. If none of its cited pages
     were in the excerpts (a small model sometimes invents a page number), list the excerpts that were used."""
+    if is_unlinked(answer):
+        return []  # nothing in the answer came from these excerpts: showing them as sources would mislead
     cited_pages = {int(p) for p in CITE.findall(answer)}
     if cited_pages and not cited_pages & {h.payload["page"] for h in hits}:
         cited_pages = set()

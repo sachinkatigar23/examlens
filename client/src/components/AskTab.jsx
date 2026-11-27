@@ -79,7 +79,8 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
         { question: q, mode: useMode, thread, photoId: photo?._id },
         { signal: controller.signal, onToken: (t) => patchLast((m) => ({ content: m.content + t })) },
       );
-      patchLast({ citations: done.citations ?? [], provider: done.provider, model: done.model, marks: done.marks, pending: false });
+      // done.content = the answer with page citations added to lines that had none.
+      patchLast({ ...(done.content ? { content: done.content } : {}), citations: done.citations ?? [], provider: done.provider, model: done.model, marks: done.marks, pending: false });
     } catch (err) {
       if (err.name === 'AbortError') patchLast({ pending: false, stopped: true });
       else patchLast({ pending: false, error: { message: err.message, code: err.code } });

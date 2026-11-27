@@ -102,6 +102,7 @@ export async function collectAiStream(path, body, signal) {
     else if (event === 'error') error = data;
   }
   if (!meta && !error) error = { message: 'The AI service stopped before finishing the answer.', code: 'cut_off' };
+  if (meta?.content) text = meta.content; // the corrected text (page citations added), see streamRelay.js
   return { text, meta, error };
 }
 

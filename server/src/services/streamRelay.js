@@ -51,6 +51,8 @@ export async function relayAiStream(req, res, { path, body, onStart, onFinish, k
   }
 
   const stopped = upstreamAbort.signal.aborted;
+  // The AI service may send a corrected text at the end (page citations added to uncited lines): that one is saved.
+  if (meta?.content) text = meta.content;
   const citations = meta ? await withFileNames(meta.citations) : [];
   const complete = Boolean(meta) && !error;
   // Save whatever was produced; the caller decides whether a partial text is worth keeping.

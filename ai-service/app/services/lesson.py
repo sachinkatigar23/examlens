@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 
 from app.schemas import LessonRequest
 from app.services.llm import LLMError, get_provider
-from app.services.retrieval import citations, context_block, search_notes, sse
+from app.services.retrieval import citations, context_block, ensure_citations, search_notes, sse
 
 LESSON_EXCERPTS = 8
 MIN_SCORE = 0.5  # below this the notes don't really cover the topic
@@ -63,7 +63,10 @@ async def lesson_stream(req: LessonRequest) -> AsyncIterator[str]:
         async for token in provider.stream_chat(messages, temperature=0.2, max_tokens=1400):
             lesson += token
             yield sse("token", {"text": token})
-        yield sse("done", {"citations": citations(hits, lesson), "grounded": True, **meta})
+        done = {"grounded": True, **meta}
+        if (fixed := ensure_citations(lesson, hits)) != lesson:
+            lesson, done["content"] = fixed, fixed
+        yield sse("done", {"citations": citations(hits, lesson), **done})
     except LLMError as exc:
         yield sse("error", {"message": str(exc), "code": exc.code})
     except Exception as exc:

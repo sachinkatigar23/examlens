@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from app.config import settings
 from app.schemas import AskRequest
 from app.services.llm import LLMError, get_provider
-from app.services.retrieval import citations, context_block, search_notes, sse
+from app.services.retrieval import citations, context_block, ensure_citations, search_notes, sse
 
 NOT_FOUND = (
     "I couldn't find this in your notes. Try asking with the words your notes use, "
@@ -84,6 +84,8 @@ Cite the page after facts like [p. 12]."""
 # line wins. Refusals are handled by the system rule + cutting the stream after a refusal line, below.)
 
 REFUSAL = "i couldn't find this in your notes"
+# "Your notes don't cover this; using a general method:" (doubts, programs): no page citations to add.
+NOT_IN_NOTES = "your notes don"
 
 DOUBT_SYSTEM = """You are ExamLens, a tutor. The student photographed a problem or a piece of code they are stuck on.
 1. Solve it step by step, numbering the steps. Follow the method, notation and terms used in the note
@@ -193,9 +195,13 @@ async def answer_stream(req: AskRequest) -> AsyncIterator[str]:
         marks = snap_marks(req.marks or found_marks)
         meta = {"provider": provider.mode, "model": provider.model, "marks": marks}
 
-        # Follow-ups like "explain more" carry little meaning alone; the previous question helps retrieval.
+        # Follow-ups like "explain it more simply" carry little meaning alone; the previous question helps
+        # retrieval. Only real follow-ups: "Explain depth first search" right after a knowledge-base question
+        # was short enough to count as one, retrieved knowledge-base pages, and got an answer citing pages that
+        # were never retrieved.
         last_user = next((m.content for m in reversed(req.history) if m.role == "user"), "")
-        search_text = f"{last_user}\n{query}" if req.purpose == "ask" and len(query) < 40 and last_user else query
+        follow_up = req.purpose == "ask" and last_user and is_follow_up(query)
+        search_text = f"{last_user}\n{query}" if follow_up else query
         hits = await search_notes(req.space_id, search_text, TOP_K[marks], unit=req.unit)
 
         # The guard: if even the best excerpt is only loosely related, don't let the model guess.
@@ -221,7 +227,12 @@ async def answer_stream(req: AskRequest) -> AsyncIterator[str]:
             yield sse("token", {"text": token})
 
         grounded = REFUSAL not in answer.lower()
-        yield sse("done", {"citations": citations(hits, answer) if grounded else [], "grounded": grounded, **meta})
+        done = {"grounded": grounded, **meta}
+        if grounded and not answer.lstrip().lower().startswith(NOT_IN_NOTES):
+            # Every grounded answer shows its pages; `content` replaces the streamed text when lines were cited.
+            if (fixed := ensure_citations(answer, hits)) != answer:
+                answer, done["content"] = fixed, fixed
+        yield sse("done", {"citations": citations(hits, answer) if grounded else [], **done})
     except LLMError as exc:
         yield sse("error", {"message": str(exc), "code": exc.code})
     except Exception as exc:  # e.g. Qdrant down
