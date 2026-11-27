@@ -3,7 +3,7 @@ import PageTransition from './PageTransition.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 
 // A tiny, static "topics × years" tally: a preview of what the Analyzer shows. Real rows from the demo data
-// (samples/: Computer Networks papers 2022–2025), so the claim above is true.
+// (demo-data/: Computer Networks papers 2022–2025), so the claim above is true.
 const PREVIEW = [
   { topic: 'Network models', marks: [1, 1, 1, 1] },
   { topic: 'Congestion control', marks: [1, 1, 1, 1] },

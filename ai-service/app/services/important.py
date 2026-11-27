@@ -1,13 +1,13 @@
 """College "important questions" PDF -> questions with unit + marks, and (when the notebook has no syllabus)
 syllabus-like topics derived from those questions.
 
-Typical layout (real AI question bank):
+Typical layout (a college question bank):
     UNIT – I
-    Introduction to Artificial Intelligence
+    Introduction to Networks
     2-Marks Questions
-     1. Define Intelligence.
+     1. Define data communication.
     5 - Marks Questions
-    1 Explain the architecture of a Knowledge Base Agent.     <- number without a dot
+    1 Explain the components of data communication.     <- number without a dot
     10 marks
     ...
 """
