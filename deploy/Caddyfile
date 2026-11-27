@@ -1,0 +1,28 @@
+# Caddy in front of the whole app (docker-compose.prod.yml): HTTPS certificates for $DOMAIN are fetched and
+# renewed automatically (Let's Encrypt), http:// redirects to https://. Everything goes to the client container,
+# whose nginx serves the React app and forwards /api to the server.
+
+{$DOMAIN} {
+	# Compress pages and API JSON, but never the answer streams (text/event-stream): those must reach the
+	# browser token by token.
+	encode zstd gzip {
+		match {
+			header Content-Type text/html*
+			header Content-Type text/css*
+			header Content-Type text/plain*
+			header Content-Type application/javascript*
+			header Content-Type application/json*
+			header Content-Type image/svg+xml*
+		}
+	}
+
+	reverse_proxy client:80 {
+		# Pass every chunk on immediately (Server-Sent Events: Ask, lessons, answers stream in).
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

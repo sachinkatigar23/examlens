@@ -33,9 +33,9 @@ def _missing(model: str) -> OllamaError:
     return OllamaError(f"Model {model} is not installed in Ollama. Run `ollama pull {model}`", "model_missing")
 
 
-async def ollama_post(path: str, body: dict, timeout: float = 300) -> dict:
+async def ollama_post(path: str, body: dict, timeout: float | None = None) -> dict:
     try:
-        async with httpx.AsyncClient(base_url=settings.ollama_url, timeout=timeout) as client:
+        async with httpx.AsyncClient(base_url=settings.ollama_url, timeout=timeout or settings.ollama_timeout) as client:
             res = await client.post(path, json=body)
     except httpx.HTTPError as exc:
         raise _friendly(exc) from exc
@@ -86,7 +86,7 @@ class OllamaProvider(LLMProvider):
             "messages": messages,
         }
         try:
-            async with httpx.AsyncClient(base_url=settings.ollama_url, timeout=httpx.Timeout(300, connect=5)) as client:
+            async with httpx.AsyncClient(base_url=settings.ollama_url, timeout=httpx.Timeout(settings.ollama_timeout, connect=5)) as client:
                 async with client.stream("POST", "/api/chat", json=body) as res:
                     if res.status_code >= 400:
                         await res.aread()
@@ -119,7 +119,7 @@ class OllamaProvider(LLMProvider):
             "options": {"temperature": 0, "num_ctx": EXTRACT_CONTEXT},
             "messages": [{"role": "user", "content": prompt, "images": [base64.b64encode(image).decode()]}],
         }
-        data = await ollama_post("/api/chat", body, timeout=600)
+        data = await ollama_post("/api/chat", body, timeout=max(600, settings.ollama_timeout))
         return data.get("message", {}).get("content", "").strip()
 
 

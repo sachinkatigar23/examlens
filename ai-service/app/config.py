@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     chat_model: str = "qwen2.5:3b"
     embed_model: str = "nomic-embed-text"
     upload_dir: str = "../storage/uploads"
+    # Seconds to wait for Ollama (a whole reply, or the gap between streamed tokens). A CPU-only server needs more.
+    ollama_timeout: float = 300
 
     # Cloud mode (optional). No key -> Cloud is shown as unavailable, everything else works.
     gemini_api_key: str = ""

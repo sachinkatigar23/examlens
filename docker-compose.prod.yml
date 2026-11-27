@@ -1,0 +1,189 @@
+# ExamLens in production: a public demo on one small CPU-only server (built for an Oracle Cloud ARM VM:
+# 2 OCPU, 12 GB RAM, no GPU). Step-by-step setup: docs/DEPLOY.md. Local development still uses docker-compose.yml.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml --profile demo run --rm seed     # demo notebook, pre-written
+#
+# Differences from docker-compose.yml:
+#   - Only Caddy is reachable from outside (80/443, automatic HTTPS for $DOMAIN). Nothing else publishes a port.
+#   - Ollama runs in a container on the CPU (no GPU here), with its models in a named volume.
+#   - PUBLIC_DEMO=true: sign-ups closed, the demo account is read-only, stricter limits (see .env.example).
+#   - Memory limits that add up to ~10 GB (the rest is for Ubuntu), and restart: always.
+# Every image is multi-arch (amd64 + arm64); the three app images are built on the server itself.
+
+name: examlens-prod
+
+x-defaults: &defaults
+  restart: always
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" } # keep the small boot disk from filling up
+
+services:
+  caddy:
+    <<: *defaults
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env (e.g. examlens.example.com)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates: keep them, or Let's Encrypt rate limits bite after a few re-deploys
+      - caddy_config:/config
+    depends_on:
+      - client
+    mem_limit: 256m
+
+  client:
+    <<: *defaults
+    build: ./client
+    depends_on:
+      server:
+        condition: service_healthy
+    mem_limit: 128m
+
+  server:
+    <<: *defaults
+    build: ./server
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/examlens
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 7d
+      CLIENT_URL: https://${DOMAIN}
+      AI_SERVICE_URL: http://ai-service:8000
+      SERVICE_KEY: ${SERVICE_KEY:?set SERVICE_KEY in .env}
+      UPLOAD_DIR: /data/uploads
+      TRUST_PROXY: 1 # the client's nginx; it takes the visitor's IP from Caddy (see client/nginx.conf)
+      COOKIE_SECURE: "true"
+      PUBLIC_DEMO: ${PUBLIC_DEMO:-true}
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@examlens.local}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-examlens-demo}
+      DEMO_CLOUD_PER_IP: ${DEMO_CLOUD_PER_IP:-5}
+      DEMO_ASK_PER_IP: ${DEMO_ASK_PER_IP:-30}
+      DEMO_MAX_CONCURRENT: ${DEMO_MAX_CONCURRENT:-2}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    mem_limit: 512m
+
+  ai-service:
+    <<: *defaults
+    build: ./ai-service
+    # GEMINI_API_KEY (optional Cloud mode) and friends live in ai-service/.env; the values below win over it.
+    env_file:
+      - path: ./ai-service/.env
+        required: false
+    environment:
+      SERVICE_KEY: ${SERVICE_KEY:?set SERVICE_KEY in .env}
+      NODE_API_URL: http://server:5000
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_TIMEOUT: 1200 # CPU only: a long prompt can take minutes before the first word
+      CHAT_MODEL: ${CHAT_MODEL:-qwen2.5:3b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads:ro
+      - ai_state:/app/data # today's Cloud (Gemini) usage, kept across restarts
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    mem_limit: 1536m
+
+  # Local models on the CPU. Pull them once (docs/DEPLOY.md):
+  #   docker compose -f docker-compose.prod.yml exec ollama ollama pull qwen2.5:3b
+  ollama:
+    <<: *defaults
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_NUM_PARALLEL: 1 # 2 CPU cores: one answer at a time is fastest overall
+      OLLAMA_MAX_LOADED_MODELS: 2 # chat + embeddings stay loaded together
+      OLLAMA_KEEP_ALIVE: 24h # never unload between visitors (loading from disk takes ~10 s)
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    mem_limit: 5g # qwen2.5:3b (~2 GB) + nomic-embed-text + context: ~3 GB in use
+
+  mongo:
+    <<: *defaults
+    image: mongo:7
+    command: ["--wiredTigerCacheSizeGB", "0.25"] # the default sizes itself from the host's RAM, not the limit
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+
+  qdrant:
+    <<: *defaults
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+
+  # One-off: `docker compose -f docker-compose.prod.yml --profile demo run --rm seed` (see docs/DEPLOY.md).
+  # It uses SERVICE_KEY to get past the closed sign-ups and the read-only demo account.
+  seed:
+    image: node:24-slim
+    profiles: ["demo"]
+    restart: "no"
+    working_dir: /work
+    command: ["node", "scripts/seed-demo.mjs"]
+    environment:
+      API_URL: http://server:5000/api/v1
+      SERVICE_KEY: ${SERVICE_KEY}
+      DEMO_DIR: /work/demo-data
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@examlens.local}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-examlens-demo}
+      SEED_MODE: ${SEED_MODE:-local} # cloud = faster, but the free Gemini quota won't cover a whole notebook
+      WAIT_MINUTES: 120
+    volumes:
+      - ./scripts:/work/scripts:ro
+      - ./demo-data:/work/demo-data:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    mem_limit: 256m
+
+volumes:
+  mongo_data:
+  qdrant_data:
+  ollama_models:
+  uploads:
+  ai_state:
+  caddy_data:
+  caddy_config:

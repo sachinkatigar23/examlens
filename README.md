@@ -217,6 +217,13 @@ a year like `2023` → past paper of that year, anything else → notes (`unit3`
 Only port 8080 (plus MongoDB and Qdrant for dev mode) is published. The API and the AI service are reachable only
 inside the Docker network.
 
+### Public deployment (demo server)
+
+[`docker-compose.prod.yml`](docker-compose.prod.yml) runs the whole stack on one CPU-only server (built for an
+Oracle Cloud ARM VM, 2 cores / 12 GB): Caddy with automatic HTTPS in front, Ollama in a container, no other ports
+published, memory limits, and a **public demo mode** (sign-ups closed, a read-only demo account with pre-written
+answers, lessons and revision sheets, per-IP limits). Step by step: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ### For development (hot reload)
 
 One terminal per app, each starting in the repo root. In `server/.env` and `ai-service/.env`, set the same
