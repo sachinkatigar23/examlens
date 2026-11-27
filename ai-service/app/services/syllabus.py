@@ -81,12 +81,16 @@ async def extract_topics(pages: list[Page]) -> list[dict]:
     units = split_units(pages)
     if len(units) >= 2:
         for label, text in units:
+            title = unit_title(text)  # "Unit 3" → "The Network Layer", shown next to the unit in Study/Bank
             parsed = parse_labelled_topics(text)
             if parsed:
-                topics.extend({"unit": label, **t} for t in parsed)
+                topics.extend({"unit": label, "unit_title": title, **t} for t in parsed)
                 continue
             result = await chat_json(SYSTEM, f"This is {label} of the syllabus:\n\n{text[:5000]}", ExtractedTopics)
-            topics.extend({"unit": label, "name": t.name.strip(), "details": t.details.strip()} for t in result.topics)
+            topics.extend(
+                {"unit": label, "unit_title": title, "name": t.name.strip(), "details": t.details.strip()}
+                for t in result.topics
+            )
     else:
         # No clear unit headings: let the model infer units from the whole text, a few pages at a time.
         text = "\n".join(p.text for p in pages)
