@@ -62,6 +62,26 @@
     {
       "key": "cloudAvailable",
       "value": ""
+    },
+    {
+      "key": "today",
+      "value": ""
+    },
+    {
+      "key": "tomorrow",
+      "value": ""
+    },
+    {
+      "key": "examDate",
+      "value": ""
+    },
+    {
+      "key": "planItemId",
+      "value": ""
+    },
+    {
+      "key": "checkId",
+      "value": ""
     }
   ],
   "item": [
@@ -2732,6 +2752,830 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Tier 2 (plan, check my answer, revision sheet)",
+      "item": [
+        {
+          "name": "Plan – none yet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan?today={{today}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ],
+              "query": [
+                {
+                  "key": "today",
+                  "value": "{{today}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Local calendar days, as the browser sends them.",
+                  "const day = (n) => { const d = new Date(Date.now() + n * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };",
+                  "pm.collectionVariables.set('today', day(0));",
+                  "pm.collectionVariables.set('tomorrow', day(1));",
+                  "pm.collectionVariables.set('examDate', day(4));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('no plan before an exam date is set', () => pm.expect(pm.response.json().plan).to.equal(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – exam date in the past (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examDate\": \"2020-01-01\",\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – not a date (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examDate\": \"next week\",\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('validation error', () => pm.expect(pm.response.json().error.code).to.equal('VALIDATION_ERROR'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – set exam date",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ]
+            },
+            "description": "Day-by-day plan until the exam (no LLM). The day before the exam is revision day.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examDate\": \"{{examDate}}\",\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().plan;",
+                  "pm.test('4 days left', () => pm.expect(p.daysLeft).to.equal(4));",
+                  "pm.test('the eve is revision day', () => pm.expect(p.days[p.days.length - 1].items.some((i) => i.kind === 'revision')).to.be.true);",
+                  "// Tick a topic on the LAST study day, so today's items stay unticked (a missed day for the re-plan test).",
+                  "const item = p.days.flatMap((d) => d.items).filter((i) => i.kind === 'topic').pop();",
+                  "pm.test('has topics to study', () => pm.expect(item).to.be.an('object'));",
+                  "if (item) pm.collectionVariables.set('planItemId', item._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – tick a topic",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan/items/{{planItemId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan",
+                "items",
+                "{{planItemId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"done\": true,\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().plan;",
+                  "pm.test('item done', () => pm.expect(p.days.flatMap((d) => d.items).find((i) => i._id === pm.collectionVariables.get('planItemId')).done).to.be.true);",
+                  "pm.test('topic remembered as studied', () => pm.expect(p.studiedTopics.length).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – unknown item (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan/items/000000000000000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan",
+                "items",
+                "000000000000000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"done\": true,\n  \"today\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – a missed day re-plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan?today={{tomorrow}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ],
+              "query": [
+                {
+                  "key": "today",
+                  "value": "{{tomorrow}}"
+                }
+              ]
+            },
+            "description": "Asked for as if it were tomorrow: today's unticked items were missed, so the plan is redone from tomorrow."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().plan;",
+                  "pm.test('re-planned', () => { pm.expect(p.justReplanned).to.be.true; pm.expect(p.startDate).to.equal(pm.collectionVariables.get('tomorrow')); });",
+                  "pm.test('ticked topic stays out', () => pm.expect(p.days.flatMap((d) => d.items).every((i) => !p.studiedTopics.includes(i.topic))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spaces – countdown on the card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces?today={{today}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces"
+              ],
+              "query": [
+                {
+                  "key": "today",
+                  "value": "{{today}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json().spaces.find((x) => x._id === pm.collectionVariables.get('spaceId'));",
+                  "pm.test('plan summary', () => { pm.expect(s.plan).to.be.an('object'); pm.expect(s.plan).to.have.property('daysLeft'); pm.expect(s.plan.today).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check – answer too short (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionId\": \"{{questionId}}\",\n  \"answer\": \"BFS\",\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check – no question (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answer\": \"A long enough answer without any question.\",\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check – unknown question (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionId\": \"000000000000000000000000\",\n  \"answer\": \"A long enough answer to a missing question.\",\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check my answer (SSE, typed, Local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks"
+              ]
+            },
+            "description": "Streams event: grade (estimated marks, breakdown, covered, missing) first, then the full-marks version, then done. Saved as an attempt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionId\": \"{{questionId}}\",\n  \"marks\": 2,\n  \"answer\": \"A protocol is a set of rules that decides how data is sent and received between devices. Example: HTTP is used by web browsers.\",\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "const t = pm.response.text();",
+                  "pm.test('grade comes before the improved answer', () => { pm.expect(t).to.include('event: grade'); pm.expect(t.indexOf('event: grade')).to.be.below(t.indexOf('event: token')); });",
+                  "pm.test('done', () => pm.expect(t).to.include('event: done'));",
+                  "const m = t.match(/\"checkId\": ?\"([a-f0-9]{24})\"/);",
+                  "pm.test('saved as an attempt', () => pm.expect(m).to.not.equal(null));",
+                  "if (m) pm.collectionVariables.set('checkId', m[1]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checks – attempts for the question",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks?questionId={{questionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks"
+              ],
+              "query": [
+                {
+                  "key": "questionId",
+                  "value": "{{questionId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('at least one attempt', () => pm.expect(pm.response.json().checks.length).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checks – one attempt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks/{{checkId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks",
+                "{{checkId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json().check;",
+                  "pm.test('estimate within the marks', () => { pm.expect(c.estimatedMarks).to.be.within(0, c.marks); });",
+                  "pm.test('marks breakdown adds up', () => pm.expect(c.breakdown.reduce((s, b) => s + b.got, 0)).to.be.closeTo(c.estimatedMarks, 0.51));",
+                  "pm.test('has the improved version', () => pm.expect(c.improved.length).to.be.above(20));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transcribe – unknown purpose (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/photos/{{photoId}}/transcribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "photos",
+                "{{photoId}}",
+                "transcribe"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\",\n  \"purpose\": \"essay\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revision sheet – data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/revision/Unit%201",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "revision",
+                "Unit%201"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('unit topics', () => pm.expect(r.topics.length).to.be.above(0));",
+                  "pm.test('top questions from the data', () => pm.expect(r.topQuestions).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revision sheet – write (SSE, Local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/revision/Unit%201",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "revision",
+                "Unit%201"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an event stream', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));",
+                  "const t = pm.response.text();",
+                  "pm.test('done or a clear no-notes error', () => pm.expect(/event: done|no_notes/.test(t)).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revision sheet – unknown unit (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/revision/Unit%2099",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "revision",
+                "Unit%2099"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checks – delete attempt (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/checks/{{checkId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "checks",
+                "{{checkId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plan – remove exam date (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/spaces/{{spaceId}}/plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spaces",
+                "{{spaceId}}",
+                "plan"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Exam countdown planner, Check my answer and last-night revision sheets. Local mode only (no Cloud quota used)."
     },
     {
       "name": "Cleanup",

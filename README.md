@@ -24,10 +24,20 @@ choose it.
   *diagram to draw*, example/code/table, advantages, conclusion. **Answer all** works through the bank in the
   background (resumable), and the **answer booklet** prints to PDF. A badge shows "also asked in 2023, 2025" when a
   past paper had the same question.
+- **Check my answer:** pick a question (or type one), then type your own answer or photograph your handwritten
+  sheet. You get an **estimated mark** with the breakdown behind it (key points from your notes, diagram, example,
+  points, conclusion), what you covered, what's missing, and a **full-marks version** of your own answer, cited to
+  your notes. Every attempt is saved, so you can watch a question go from 3/10 to 8/10.
+- **Exam countdown:** set the exam date and get a day-by-day plan: the most-asked topics (past-paper years, marks,
+  question bank) make the cut, studied ones drop out, and the day before the exam is revision day. Tick topics off;
+  miss a day and the plan is redone from today. The dashboard says "4 days to the AI exam · today: Unit 2 – …".
+- **Last-night revision sheet:** one printable page per unit with key definitions, diagrams to draw, formulas/code
+  and must-remember facts from your notes, plus the unit's most likely questions with their marks.
 - **Snap a doubt:** photograph a printed problem or a piece of code, check the transcription, and get a step-by-step
   solution that follows the method in your notes (for code: the bug and the fixed code).
 - **Local or Cloud, your choice:** every answer shows which model wrote it (`Local · qwen2.5:3b` /
-  `Cloud · gemini-3.5-flash-lite`). Local is the default.
+  `Cloud · gemini-3.5-flash-lite`). Local is the default. Next to the toggle, ExamLens shows how much of today's
+  free Cloud quota is left ("≈14 of 20 left today", or "limit reached · resets 1:30 PM").
 - **Analyzer:** a topics × years heatmap of your past papers. Hot topics are ranked by how many different years
   they were asked in, then by marks. "Asked again" lists questions that appear in more than one year's paper. Click
   any cell to see the actual questions, and move a question to another topic if the match is wrong (low-confidence
@@ -48,6 +58,10 @@ choose it.
 | **Analyzer:** heatmap, hot topics, repeated questions | **Ask:** streamed answers with page stickers |
 | ![Documents](docs/screenshots/documents.png) | ![Dashboard](docs/screenshots/dashboard.png) |
 | **Documents:** upload tray and status chips | **Dashboard:** one notebook per subject |
+| ![Check my answer](docs/screenshots/check-my-answer.png) | ![Exam countdown](docs/screenshots/exam-countdown.png) |
+| **Check my answer:** an estimated mark you can trace | **Exam countdown:** a day-by-day plan in Study |
+| ![Revision sheet](docs/screenshots/revision-sheet.png) | |
+| **Last-night sheet:** one printable page per unit | |
 | ![Night study mode](docs/screenshots/analyzer-dark.png) | ![3D landing, heatmap stage](docs/screenshots/landing-heatmap-dark.png) |
 | **Night study mode** (dark theme) | **Landing:** the 3D pile of papers becomes a heatmap |
 
@@ -60,12 +74,13 @@ real Artificial Intelligence subject (4 units of notes + the college question ba
 | | Local (default) | Cloud (optional) |
 |---|---|---|
 | Chat model | `qwen2.5:3b` in Ollama on your GPU | Google Gemini (`GEMINI_MODEL`) |
-| Sent over the internet | nothing | the question, the few note passages retrieved for it, and (Snap a doubt) the photo |
+| Sent over the internet | nothing | the question, the few note passages retrieved for it, your typed answer (Check my answer), and for photos the image |
 | PDFs, indexing, search | on your machine | **still on your machine**: embeddings are always local, so switching never needs re-indexing |
 
 Cloud needs `GEMINI_API_KEY` in `ai-service/.env`; without it the toggle shows Cloud as "not set up". The
 first time you switch to Cloud, ExamLens shows this privacy note. If the local model is offline, an answer
-offers "Use Cloud for this answer?" instead of switching silently.
+offers "Use Cloud for this answer?" instead of switching silently. "Check my answer" uses Local for typed answers
+and Cloud for photos (reading handwriting), unless you change the toggle.
 
 ## Architecture
 
@@ -119,9 +134,12 @@ flowchart LR
 | **Syllabus** | Units are found by their "Unit 3 / UNIT-III / Module 3" headings. Units written as "Label: item, item." are parsed directly (exact and repeatable); other formats go to `qwen2.5:3b` with a JSON schema at temperature 0. |
 | **Past papers** | Regex extraction of numbers, sub-parts and marks (section headers like `(6 x 2 = 12)` fill in missing marks); falls back to the LLM if fewer than 5 questions are found. Each question is matched to its nearest topic. |
 | **Repeats** | Two questions are the same if they are semantically close (cosine ≥ 0.85) **and** share ≥ 60% of their content words. Embeddings alone call "half duplex" vs "full duplex" a repeat. |
-| **Question bank** | "UNIT – II" and "5-Marks Questions" headings give each question its unit and marks (97/97 on the real AI bank). With no syllabus in the notebook, the LLM names 4–8 topics per unit and every question goes to its nearest name by embedding. |
+| **Question bank** | "UNIT – II" and "5-Marks Questions" headings give each question its unit and marks (97/97 on the real AI bank). With no syllabus in the notebook, topics are derived from the bank: each long question names its topic (temperature 0; a name must share a word with its question), names are merged by their distinctive words, short questions follow by keyword → most similar long question → a constrained LLM choice, then a similarity check moves strays and an over-full topic is split. |
 | **Units** | Notes are uploaded for a unit (or "Mixed"); every chunk is tagged with its unit and nearest topic, and re-tagged when the syllabus changes. Study lessons retrieve by unit/topic. |
 | **Answers** | Notes-only retrieval (more passages for more marks: 2→4, 5→6, 10→10, 16→12) → if even the best one is weakly related, "I couldn't find this in your notes" → otherwise a marks-shaped prompt streams the answer over SSE, with `[p. N]` citations turned into stickers. |
+| **Citations** | After every answer: citations of pages that weren't retrieved are removed, uncited lines get the page of the passage they match, and an answer that matches no passage says so instead of showing unrelated pages. |
+| **Check my answer** | The model lists the key points a full-marks answer needs (from the notes) and whether your answer has each, double-checked by word overlap. Code checks the format (length, diagram, example, points, conclusion) and adds up a fixed marking scheme, e.g. 10 marks = key points 6 + diagram 1.5 + example 1 + points 1 + conclusion 0.5. |
+| **Planner** | No LLM: priority = 2 × past-paper years + highest marks / 5 + 1 if in the bank + 0.25 per bank question. At most 5 topics a day, learnt in syllabus order. |
 | **Providers** | `llm/base.py` interface (`stream_chat`, `chat_json`, `vision`) with an Ollama and a Gemini implementation, picked per request. |
 
 All thresholds were measured on real test data, not guessed. The numbers are in [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md).
@@ -168,6 +186,11 @@ The default Cloud model is `gemini-3.5-flash-lite`: on the free tier each model 
 limit (20/day on `gemini-3.6-flash` when tested), so use Cloud for individual answers, lessons and photos, and Local
 for "Answer all" on a whole question bank. When a limit is hit, ExamLens says which one and when it resets.
 
+**Uploaded files** live in `./storage/uploads` (a bind mount), the same folder dev mode uses, so a file uploaded in
+either mode works in both. (On Linux, make the folder writable by uid 1000: `sudo chown -R 1000 storage/uploads`.)
+Older installs kept uploads in a Docker volume; they were copied over, and the volume can be removed with
+`docker volume rm examlens_uploads`.
+
 **Demo data (optional).** Put PDFs in `samples/` (the folder is gitignored). File names decide what they are:
 `syllabus` in the name → syllabus, a year like `2023` → past paper of that year, anything else → notes. Then:
 
@@ -200,7 +223,8 @@ Use either the full Docker stack or the dev servers at one time: both use the sa
 ### Tests
 
 The Postman collection in [postman/](postman/) covers every route, with assertions (auth, validation errors,
-uploads, ownership, SSE, analysis):
+uploads, ownership, SSE, analysis, and a Tier 2 folder for the planner, Check my answer and revision sheets that
+runs in Local mode only, so it uses no Cloud quota). Run it from the repo root (fixture paths are relative to it):
 
 ```bash
 npx newman run postman/ExamLens.postman_collection.json                                  # dev API
@@ -226,7 +250,10 @@ Base `/api/v1`, JSON, errors as `{ "error": { "code", "message" } }`.
 | `GET /spaces/:id/answers?unit=` | Answer booklet |
 | `GET /spaces/:id/study`, `GET/POST/PATCH /spaces/:id/topics/:tid/lesson` | Units → topics with status; lesson (SSE); mark studied |
 | `POST /spaces/:id/photos`, `…/photos/:pid/transcribe`, `GET …/photos/:pid/file` | Snap a doubt |
-| `GET /ai/providers`, `PATCH /auth/me/settings` | What Local/Cloud can do right now; default mode |
+| `POST /spaces/:id/checks`, `GET …/checks?questionId=`, `GET/DELETE …/checks/:cid` | Check my answer (SSE: `grade` → tokens → `done`); attempts |
+| `GET/PUT/DELETE /spaces/:id/plan`, `PATCH …/plan/items/:iid` | Exam countdown (`?today=` / `today` = the browser's local day) |
+| `GET/POST /spaces/:id/revision/:unit` | Last-night revision sheet: cached sheet + top questions / write it (SSE) |
+| `GET /ai/providers`, `PATCH /auth/me/settings` | What Local/Cloud can do right now (incl. today's Cloud quota); default mode |
 | `GET /health` | API, MongoDB and AI service status |
 
 ## Project structure
@@ -237,7 +264,7 @@ examlens/
 ├── server/        Express API: config, models, controllers, routes, middleware, services, validators
 ├── ai-service/    FastAPI: routers (ingest, ask, study, rematch, documents, health) and services (pdf, chunking,
 │                  embeddings, qdrant, llm/ providers, syllabus, questions, important, matching, units,
-│                  retrieval, answer, lesson, vision, ingest)
+│                  retrieval, answer, lesson, check, revision, vision, ingest)
 ├── scripts/       seed-demo.mjs
 ├── postman/       API collection + fixtures
 ├── docs/          BUILD_NOTES.md (decisions and measurements), screenshots/
@@ -245,9 +272,6 @@ examlens/
 ```
 
 ## Roadmap
-
-Next (Tier 2): **Check my answer** (estimated marks for your own written answer, with what's missing), an **exam
-countdown planner** (day-by-day plan from topic priority) and a one-page **last-night revision sheet** per unit.
 
 v2:
 
