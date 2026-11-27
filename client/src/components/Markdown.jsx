@@ -36,9 +36,14 @@ const CITE = /\[p\.\s*(\d+(?:\s*,\s*(?:p\.\s*)?\d+)*)\]/g;
 function linkCitations(text) {
   return text
     .split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g)
-    .map((part, i) => (i % 2 ? part : part.replace(CITE, (_, pages) => pages.match(/\d+/g).map((n) => `[p. ${n}](cite:${n})`).join(''))))
+    .map((part, i) => (i % 2 ? part : escapeStarNames(part).replace(CITE, (_, pages) => pages.match(/\d+/g).map((n) => `[p. ${n}](cite:${n})`).join(''))))
     .join('');
 }
+
+// "**A* Search**" rendered as "*A Search**": the star of A*, AO*, IDA* was read as emphasis. A star right
+// after a short all-capitals name (and not part of "**") is escaped. Code is left alone (see above).
+const STAR_NAME = /\b([A-Z]{1,3})\*(?![*\w])/g;
+const escapeStarNames = (text) => text.replace(STAR_NAME, '$1\\*');
 
 const urlTransform = (url) => (url.startsWith('cite:') ? url : defaultUrlTransform(url));
 
