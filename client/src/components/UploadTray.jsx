@@ -53,7 +53,7 @@ export default function UploadTray({ spaceId, onUploaded }) {
     }
 
     const batch = files.map((file) => ({ id: crypto.randomUUID(), file, name: file.name, progress: 0, error: checkFile(file) }));
-    setItems((list) => [...batch.map(({ file, ...rest }) => rest), ...list].slice(0, 8));
+    setItems((list) => [...batch.map(({ file: _file, ...rest }) => rest), ...list].slice(0, 8));
 
     // One at a time keeps the progress bars readable and the server calm.
     for (const item of batch) {

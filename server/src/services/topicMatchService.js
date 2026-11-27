@@ -54,5 +54,3 @@ export function topicsChangedInBackground(spaceId) {
   retagNotes(spaceId).catch((err) => console.warn(`Retag failed for space ${spaceId}: ${err.message}`));
 }
 
-// Kept for callers that only need the questions re-matched.
-export const rematchSpaceInBackground = topicsChangedInBackground;

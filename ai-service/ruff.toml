@@ -1,0 +1,7 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+# pyflakes (unused imports/variables, undefined names), pycodestyle errors, import order, bugbear basics
+select = ["F", "E", "I", "B"]
+ignore = ["E501"] # long prompt strings read better unwrapped

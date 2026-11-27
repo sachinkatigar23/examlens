@@ -8,7 +8,6 @@ export function notFoundHandler(req, _res, next) {
 }
 
 // Every error ends up here and leaves as { error: { code, message, details? } }.
-// eslint-disable-next-line no-unused-vars
 export async function errorHandler(err, req, res, _next) {
   // If the request failed after multer saved a file, don't leave the orphan on disk.
   if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});

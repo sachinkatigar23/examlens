@@ -4,7 +4,7 @@ import re
 
 from app.schemas import ExtractedTopics
 from app.services.llm import chat_json
-from app.services.pdf import Page
+from app.services.pdf import Page, all_lines
 
 UNIT_HEADING = re.compile(r"^\s*(unit|module)\s*[-–:.]?\s*([ivx]+|\d{1,2})\b[\s\-–:.]*(.*)$", re.IGNORECASE)
 # Stop reading at the book list / outcomes: they mention topics but aren't syllabus content.
@@ -29,7 +29,7 @@ def _unit_label(kind: str, number: str) -> str:
 def split_units(pages: list[Page]) -> list[tuple[str, str]]:
     """[(unit label, text)] when the syllabus has "Unit 1 / UNIT-II / Module 3" headings, else []."""
     units: list[tuple[str, list[str]]] = []
-    for line in (l for p in pages for l in p.text.splitlines()):
+    for line in all_lines(pages):
         heading = UNIT_HEADING.match(line)
         if heading:
             units.append((_unit_label(heading.group(1), heading.group(2)), [heading.group(3)]))
@@ -48,7 +48,7 @@ SENTENCE_END = re.compile(r"(?<=\.)\s+(?=[A-Z])")
 def parse_labelled_topics(unit_text: str) -> list[dict] | None:
     """Many syllabi list a unit as sentences "Label: item, item, item." Then the labels ARE the topics, so we read
     them directly (exact, repeatable, no LLM). Returns None if the unit isn't written that way."""
-    lines = [l.strip() for l in unit_text.splitlines() if l.strip()]
+    lines = [line.strip() for line in unit_text.splitlines() if line.strip()]
     # First line like "Introduction to Data Communication (12 Hours)" is the unit's title, not a topic.
     if len(lines) > 1 and ":" not in lines[0] and not lines[0].endswith("."):
         lines = lines[1:]

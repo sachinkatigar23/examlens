@@ -46,10 +46,10 @@ def _strip_repeated_lines(pages: list[list[str]]) -> list[list[str]]:
     if len(pages) < 3:
         return pages
     # Count each distinct line once per page; lines on >= 60% of pages are headers/footers.
-    counts = Counter(norm for lines in pages for norm in {_normalise(l) for l in lines if l.strip()})
+    counts = Counter(norm for lines in pages for norm in {_normalise(line) for line in lines if line.strip()})
     limit = max(2, int(len(pages) * 0.6))
     repeated = {norm for norm, n in counts.items() if n >= limit}
-    return [[l for l in lines if _normalise(l) not in repeated] for lines in pages]
+    return [[line for line in lines if _normalise(line) not in repeated] for lines in pages]
 
 
 # PyMuPDF's default flags minus TEXT_PRESERVE_LIGATURES: "ﬁber" (one ligature character, common in PDFs
@@ -72,6 +72,11 @@ def extract_pages(path: str) -> list[Page]:
 
     pages = []
     for i, lines in enumerate(lines_per_page, start=1):
-        kept = [_unglue(l.rstrip()) for l in lines if l.strip() and not NOISE_LINE.match(l)]
+        kept = [_unglue(line.rstrip()) for line in lines if line.strip() and not NOISE_LINE.match(line)]
         pages.append(Page(number=i, text="\n".join(kept)))
     return pages
+
+
+def all_lines(pages: list[Page]):
+    """Every line of every page, in order (for parsers that read a PDF top to bottom)."""
+    return (line for page in pages for line in page.text.splitlines())

@@ -6,8 +6,8 @@ Whole PDFs are never sent: ingestion always runs locally.
 
 import asyncio
 import re
-from datetime import UTC, datetime
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import httpx
 from google import genai

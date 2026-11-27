@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from app.schemas import ExtractedQuestions
 from app.services.llm import chat_json
-from app.services.pdf import Page
+from app.services.pdf import Page, all_lines
 
 MIN_REGEX_QUESTIONS = 5
 MIN_TEXT = 10
@@ -66,7 +66,7 @@ def extract_with_regex(pages: list[Page]) -> list[dict]:
     items: list[_Item] = []
     collecting = False  # False before the first question, after a section heading, and after a question's marks
     section_marks = None
-    for line in (l for p in pages for l in p.text.splitlines()):
+    for line in all_lines(pages):
         line = line.strip()
         if not line or re.fullmatch(r"(?i)or|\(?or\)?", line):
             continue

@@ -5,8 +5,8 @@ from app.deps import require_service_key
 from app.schemas import CheckRequest, LessonRequest, RetagRequest, RevisionRequest, TranscribeRequest
 from app.services.check import check_stream
 from app.services.lesson import lesson_stream
-from app.services.revision import sheet_stream
 from app.services.llm import LLMError
+from app.services.revision import sheet_stream
 from app.services.units import retag_document
 from app.services.vision import transcribe
 

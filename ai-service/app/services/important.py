@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, StringConstraints, create_model
 
 from app.services.embeddings import embed_documents, embed_queries
 from app.services.llm import LLMError, chat_json
-from app.services.pdf import Page
+from app.services.pdf import Page, all_lines
 from app.services.questions import extract_with_llm
 
 ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8}
@@ -50,7 +50,7 @@ def parse_important(pages: list[Page]) -> list[dict]:
     want_title = False
     current: dict | None = None
 
-    for raw in (l for p in pages for l in p.text.splitlines()):
+    for raw in all_lines(pages):
         line = raw.strip()
         if not line:
             continue
