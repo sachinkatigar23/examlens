@@ -54,7 +54,8 @@ services:
       EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
       UPLOAD_DIR: /data/uploads
     volumes:
-      - uploads:/data/uploads:ro
+      # Same folder as dev mode (../storage/uploads), so a file uploaded in either mode works in both.
+      - ./storage/uploads:/data/uploads:ro
     extra_hosts:
       - "host.docker.internal:host-gateway" # needed on Linux; Docker Desktop has it already
     depends_on:
@@ -85,7 +86,7 @@ services:
       TRUST_PROXY: 1
       COOKIE_SECURE: "false" # plain http on localhost
     volumes:
-      - uploads:/data/uploads
+      - ./storage/uploads:/data/uploads # bind mount shared with dev mode (see ai-service above)
     depends_on:
       mongo:
         condition: service_healthy
@@ -128,4 +129,3 @@ services:
 volumes:
   mongo_data:
   qdrant_data:
-  uploads:
