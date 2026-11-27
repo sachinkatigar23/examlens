@@ -6,7 +6,18 @@ import re
 from app.services import qdrant
 from app.services.embeddings import embed_queries
 
-CITE = re.compile(r"\[p\.\s*(\d+)\]")
+# "[p. 12]", and the multi-page "[p. 2, 8]" / "[p. 2, p. 8]" that Gemini writes.
+CITE = re.compile(r"\[p\.\s*(\d+(?:\s*,\s*(?:p\.\s*)?\d+)*)\]")
+
+
+def cited_pages_of(text: str) -> set[int]:
+    return {int(n) for group in CITE.findall(text) for n in re.findall(r"\d+", group)}
+
+
+def _keep_real(match: re.Match, real_pages: set[int]) -> str:
+    """A citation keeps only the pages that were retrieved; one with none left is removed."""
+    pages = [n for n in re.findall(r"\d+", match.group(1)) if int(n) in real_pages]
+    return f"[p. {', '.join(pages)}]" if pages else ""
 
 
 def sse(event: str, data: dict) -> str:
@@ -66,7 +77,7 @@ def ensure_citations(answer: str, hits) -> str:
     if not hits or not answer.strip():
         return answer
     real_pages = {h.payload["page"] for h in hits}
-    answer = CITE.sub(lambda m: m.group(0) if int(m.group(1)) in real_pages else "", answer)
+    answer = CITE.sub(lambda m: _keep_real(m, real_pages), answer)
     answer = re.sub(r"[ \t]+(?=\n|$)", "", answer)  # the space a removed citation leaves at a line end
     excerpts = [(h.payload["page"], _content(h.payload["text"])) for h in hits]
     lines, in_code = answer.split("\n"), False
@@ -96,7 +107,7 @@ def citations(hits, answer: str) -> list[dict]:
     were in the excerpts (a small model sometimes invents a page number), list the excerpts that were used."""
     if is_unlinked(answer):
         return []  # nothing in the answer came from these excerpts: showing them as sources would mislead
-    cited_pages = {int(p) for p in CITE.findall(answer)}
+    cited_pages = cited_pages_of(answer)
     if cited_pages and not cited_pages & {h.payload["page"] for h in hits}:
         cited_pages = set()
     result, seen = [], set()

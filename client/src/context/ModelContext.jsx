@@ -63,7 +63,7 @@ export function ModelProvider({ children }) {
             <ShieldCheck size={18} className="mt-0.5 shrink-0 text-pen" aria-hidden="true" />
             <span>
               Cloud answers come from Google Gemini ({providers.cloud.model ?? 'Gemini'}). For each answer ExamLens sends
-              only your question, the few note passages it found, and (for Snap a doubt) your photo.
+              only your question, the few note passages it found, and (for photos) the image.
             </span>
           </p>
           <p className="text-ink-muted">
