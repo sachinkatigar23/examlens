@@ -191,15 +191,18 @@ either mode works in both. (On Linux, make the folder writable by uid 1000: `sud
 Older installs kept uploads in a Docker volume; they were copied over, and the volume can be removed with
 `docker volume rm examlens_uploads`.
 
-**Demo data (optional).** Put PDFs in `samples/` (the folder is gitignored). File names decide what they are:
-`syllabus` in the name → syllabus, a year like `2023` → past paper of that year, anything else → notes. Then:
+**Demo data (optional).** [demo-data/](demo-data/) holds a shareable Computer Networks set: a sample syllabus, four
+generated model papers (2022–2025), short notes for each unit and an important-questions list. Load it with:
 
 ```bash
 docker compose --profile demo run --rm seed
 ```
 
-This creates **demo@examlens.local / examlens-demo**, uploads everything, waits until it's processed and asks one
-example question. Running it again skips files that are already uploaded (`--reset` starts the notebook over).
+This creates **demo@examlens.local / examlens-demo**, uploads everything, waits until it's processed (about 5
+minutes on a laptop GPU) and asks one example question. Running it again skips files that are already uploaded
+(`--reset` starts the notebook over). To load your own PDFs instead, put them in `samples/` (gitignored) and add
+`DEMO_DIR=samples` to `.env`. File names decide what they are: `syllabus` → syllabus, `important` → question bank,
+a year like `2023` → past paper of that year, anything else → notes (`unit3` in the name → Unit 3).
 
 Only port 8080 (plus MongoDB and Qdrant for dev mode) is published. The API and the AI service are reachable only
 inside the Docker network.

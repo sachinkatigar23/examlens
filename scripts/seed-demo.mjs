@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Demo seed: creates the demo account and a notebook, uploads every PDF in samples/, waits until the AI service
+// Demo seed: creates the demo account and a notebook, uploads every PDF in demo-data/, waits until the AI service
 // has processed them, and asks one question so the Ask tab has an example. Safe to run again: files already in
 // the notebook are skipped. No dependencies (Node 20+: fetch, FormData, Blob).
 //
@@ -7,9 +7,10 @@
 //   API_URL=http://localhost:8080/api/v1 node scripts/seed-demo.mjs   # docker stack, from the host
 //   docker compose --profile demo up seed                     # inside docker (see docker-compose.yml)
 //   node scripts/seed-demo.mjs --reset                        # delete the demo notebook first
+//   DEMO_DIR=samples node scripts/seed-demo.mjs               # your own PDFs instead of demo-data/
 //
-// File names decide the kind: "syllabus" in the name → syllabus; a year (2019, 2023, ...) → past paper of that
-// year; anything else → notes.
+// File names decide the kind: "syllabus" → syllabus; "important" → question bank; a year (2019, 2023, ...) →
+// past paper of that year; anything else → notes ("unit3" / "unit-3" in the name → Unit 3, otherwise mixed).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const API = (process.env.API_URL || 'http://localhost:5000/api/v1').replace(/\/$/, '');
-const SAMPLES = process.env.SAMPLES_DIR || path.join(ROOT, 'samples');
+const DEMO_DIR = path.resolve(ROOT, process.env.DEMO_DIR || 'demo-data');
 const EMAIL = process.env.DEMO_EMAIL || 'demo@examlens.local';
 const PASSWORD = process.env.DEMO_PASSWORD || 'examlens-demo';
 const SPACE = { name: process.env.DEMO_SPACE || 'Computer Networks – Sem 3', subject: 'Computer Networks', color: '#2C6E7F' };
@@ -91,15 +92,17 @@ async function getSpace() {
 
 function classify(file) {
   const year = file.match(/(?:19|20)\d{2}/)?.[0];
+  const unit = file.match(/unit[\s_-]*(\d+)/i)?.[1];
   if (/syllabus/i.test(file)) return { kind: 'syllabus' };
+  if (/important/i.test(file)) return { kind: 'important' };
   if (year) return { kind: 'paper', year };
-  return { kind: 'notes' };
+  return { kind: 'notes', unit: unit && `Unit ${unit}` };
 }
 
 async function upload(space) {
-  if (!fs.existsSync(SAMPLES)) throw new Error(`No samples folder at ${SAMPLES}. Put your PDFs there first.`);
-  const files = fs.readdirSync(SAMPLES).filter((f) => f.toLowerCase().endsWith('.pdf')).sort();
-  if (!files.length) throw new Error(`No PDFs in ${SAMPLES}.`);
+  if (!fs.existsSync(DEMO_DIR)) throw new Error(`No folder at ${DEMO_DIR}.`);
+  const files = fs.readdirSync(DEMO_DIR).filter((f) => f.toLowerCase().endsWith('.pdf')).sort();
+  if (!files.length) throw new Error(`No PDFs in ${DEMO_DIR}.`);
 
   const { documents } = await api('GET', `/spaces/${space._id}/documents`);
   const existing = new Set(documents.map((d) => d.originalName));
@@ -111,13 +114,14 @@ async function upload(space) {
       log(`skip ${file} (already uploaded)`);
       continue;
     }
-    const { kind, year } = classify(file);
+    const { kind, year, unit } = classify(file);
     const form = new FormData();
     form.append('kind', kind);
     if (year) form.append('year', year);
-    form.append('file', new Blob([fs.readFileSync(path.join(SAMPLES, file))], { type: 'application/pdf' }), file);
+    if (unit) form.append('unit', unit);
+    form.append('file', new Blob([fs.readFileSync(path.join(DEMO_DIR, file))], { type: 'application/pdf' }), file);
     await api('POST', `/spaces/${space._id}/documents`, form);
-    log(`uploaded ${file} as ${kind}${year ? ` ${year}` : ''}`);
+    log(`uploaded ${file} as ${kind}${year ? ` ${year}` : ''}${unit ? ` (${unit})` : ''}`);
   }
 }
 

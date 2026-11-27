@@ -52,9 +52,14 @@ def _strip_repeated_lines(pages: list[list[str]]) -> list[list[str]]:
     return [[l for l in lines if _normalise(l) not in repeated] for lines in pages]
 
 
+# PyMuPDF's default flags minus TEXT_PRESERVE_LIGATURES: "ﬁber" (one ligature character, common in PDFs
+# exported from Word) comes out as "fiber", so it matches the word "fiber" in a question.
+TEXT_FLAGS = pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP | pymupdf.TEXT_CID_FOR_UNKNOWN_UNICODE
+
+
 def extract_pages(path: str) -> list[Page]:
     with pymupdf.open(path) as doc:
-        raw = [page.get_text("text", sort=True) for page in doc]
+        raw = [page.get_text("text", sort=True, flags=TEXT_FLAGS) for page in doc]
 
     if not raw or sum(len(t.strip()) for t in raw) / len(raw) < MIN_CHARS_PER_PAGE:
         raise ScannedPdfError(

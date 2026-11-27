@@ -2,7 +2,7 @@
 #
 #   cp .env.example .env          # then put real random values in the three secrets
 #   docker compose up -d --build  # app on http://localhost:8080
-#   docker compose --profile demo up seed   # optional: demo account + everything in samples/
+#   docker compose --profile demo run --rm seed   # optional: demo account + the PDFs in demo-data/
 #
 # Dev mode (npm run dev / uvicorn on the host) only needs:  docker compose up -d mongo qdrant
 
@@ -109,7 +109,8 @@ services:
       server:
         condition: service_healthy
 
-  # Optional: `docker compose --profile demo up seed` creates the demo account and uploads samples/.
+  # Optional: `docker compose --profile demo run --rm seed` creates the demo account and uploads demo-data/.
+  # DEMO_DIR=samples (in .env) uploads your own gitignored samples/ folder instead.
   seed:
     image: node:24-slim
     profiles: ["demo"]
@@ -117,12 +118,12 @@ services:
     command: ["node", "scripts/seed-demo.mjs"]
     environment:
       API_URL: http://server:5000/api/v1
-      SAMPLES_DIR: /work/samples
+      DEMO_DIR: /work/${DEMO_DIR:-demo-data}
       DEMO_EMAIL: ${DEMO_EMAIL:-demo@examlens.local}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-examlens-demo}
     volumes:
       - ./scripts:/work/scripts:ro
-      - ./samples:/work/samples:ro
+      - ./${DEMO_DIR:-demo-data}:/work/${DEMO_DIR:-demo-data}:ro
     depends_on:
       server:
         condition: service_healthy
