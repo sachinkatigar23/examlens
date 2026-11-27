@@ -29,3 +29,6 @@ samples/
 
 # AI service runtime state (Cloud usage counter)
 ai-service/data/
+
+# demo snapshots made by scripts/reset-demo.sh
+backups/

@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 // Demo seed: creates the demo account and a notebook, uploads every PDF in demo-data/, waits until the AI service
-// has processed them, and asks one question so the Ask tab has an example. Safe to run again: files already in
-// the notebook are skipped. No dependencies (Node 20+: fetch, FormData, Blob).
+// has processed them, asks one question so the Ask tab has an example, then writes every question-bank answer,
+// every topic's lesson and every unit's revision sheet, so demo visitors never wait for those.
+// Safe to run again: uploaded files and anything already written are skipped (an interrupted run resumes).
+// No dependencies (Node 20+: fetch, FormData, Blob).
 //
 //   node scripts/seed-demo.mjs                                # dev servers: API on http://localhost:5000
 //   API_URL=http://localhost:8080/api/v1 node scripts/seed-demo.mjs   # docker stack, from the host
 //   docker compose --profile demo up seed                     # inside docker (see docker-compose.yml)
 //   node scripts/seed-demo.mjs --reset                        # delete the demo notebook first
 //   DEMO_DIR=samples node scripts/seed-demo.mjs               # your own PDFs instead of demo-data/
+//   SEED_MODE=cloud node scripts/seed-demo.mjs                # write the answers with Cloud (uses the daily quota)
+//   node scripts/seed-demo.mjs --no-generate                  # only upload + process, pre-write nothing
+//
+// Public demo (PUBLIC_DEMO=true): sign-ups are closed and the demo account is read-only, so the script sends
+// SERVICE_KEY (the server's shared secret) as X-Service-Key, which lets it create and fill the demo notebook.
 //
 // File names decide the kind: "syllabus" → syllabus; "important" → question bank; a year (2019, 2023, ...) →
 // past paper of that year; anything else → notes ("unit3" / "unit-3" in the name → Unit 3, otherwise mixed).
@@ -23,19 +30,27 @@ const EMAIL = process.env.DEMO_EMAIL || 'demo@examlens.local';
 const PASSWORD = process.env.DEMO_PASSWORD || 'examlens-demo';
 const SPACE = { name: process.env.DEMO_SPACE || 'Computer Networks – Sem 3', subject: 'Computer Networks', color: '#2C6E7F' };
 const QUESTION = process.env.DEMO_QUESTION || 'Explain the TCP three-way handshake';
+const SERVICE_KEY = process.env.SERVICE_KEY || '';
+const MODE = process.env.SEED_MODE === 'cloud' ? 'cloud' : 'local'; // which model writes the pre-generated text
 const RESET = process.argv.includes('--reset');
-const WAIT_MINUTES = 15;
+const GENERATE = !process.argv.includes('--no-generate');
+const WAIT_MINUTES = Number(process.env.WAIT_MINUTES) || 60; // a CPU-only server reads PDFs slowly
 
 let token = null;
 const log = (...a) => console.log('[seed]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const authHeaders = () => ({
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  ...(SERVICE_KEY ? { 'X-Service-Key': SERVICE_KEY } : {}),
+});
 
 async function api(method, url, body) {
   const isForm = body instanceof FormData;
   const res = await fetch(API + url, {
     method,
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders(),
       ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
     },
     body: isForm ? body : body ? JSON.stringify(body) : undefined,
@@ -143,18 +158,74 @@ async function waitUntilProcessed(space) {
   throw new Error(`Documents still processing after ${WAIT_MINUTES} minutes.`);
 }
 
-// One example question so the Ask tab isn't empty. Reads the SSE stream to the end.
+// POSTs to an SSE route and reads the stream to the end (the server saves the result once it's complete).
+// Returns null on success, or the error message.
+async function stream(url, body) {
+  const res = await fetch(API + url, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  if (!res.ok) return text.match(/"message":"([^"]*)"/)?.[1] || `HTTP ${res.status}`;
+  const error = text.match(/event: error\r?\ndata: (.*)/)?.[1];
+  return error ? (JSON.parse(error).message ?? 'error') : null;
+}
+
+// One example question so the Ask tab isn't empty.
 async function askExample(space) {
   const { messages } = await api('GET', `/spaces/${space._id}/messages`);
   if (messages.length) return log('Ask history already has messages, skipping the example question');
-  const res = await fetch(`${API}/spaces/${space._id}/ask`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: QUESTION }),
-  });
-  if (!res.ok) return log(`example question skipped: ${res.status}`);
-  await res.text(); // wait until the answer has finished streaming (the server saves it at the end)
-  log(`asked "${QUESTION}"`);
+  const error = await stream(`/spaces/${space._id}/ask`, { question: QUESTION, mode: MODE });
+  log(error ? `example question failed: ${error}` : `asked "${QUESTION}"`);
+}
+
+// Every question-bank answer, through the server's own "Answer all" job (one at a time, resumable).
+async function answerAll(space) {
+  const { questions } = await api('GET', `/spaces/${space._id}/bank`);
+  const missing = questions.filter((q) => !q.answer).length;
+  if (!missing) return log(`question bank: all ${questions.length} answers already written`);
+  log(`question bank: writing ${missing} of ${questions.length} answers (${MODE}) …`);
+  try {
+    await api('POST', `/spaces/${space._id}/bank/answer-all`, { mode: MODE });
+  } catch (err) {
+    if (err.status !== 409) throw err; // 409 = already running (the server resumed it): just wait for it
+  }
+  let job;
+  let last = '';
+  do {
+    await sleep(5000);
+    job = (await api('GET', `/spaces/${space._id}/bank/job`)).job;
+    const line = `${job.done}/${job.total}`;
+    if (line !== last) log(`question bank: ${line} answered`);
+    last = line;
+  } while (job.status === 'running');
+  if (job.status !== 'done') log(`question bank: job ${job.status}${job.error ? `: ${job.error}` : ''}`);
+}
+
+// Every topic's lesson (Study tab), then every unit's last-night revision sheet.
+async function lessonsAndSheets(space) {
+  const { units } = await api('GET', `/spaces/${space._id}/study`);
+  const topics = units.flatMap((u) => u.topics.map((t) => ({ ...t, unit: u.unit })));
+  const todo = topics.filter((t) => t.status === 'not_started');
+  log(`lessons: ${topics.length - todo.length} of ${topics.length} already written`);
+  for (const [i, t] of todo.entries()) {
+    const started = Date.now();
+    const error = await stream(`/spaces/${space._id}/topics/${t._id}/lesson`, { mode: MODE });
+    const secs = Math.round((Date.now() - started) / 1000);
+    log(`lesson ${i + 1}/${todo.length} ${t.unit} · ${t.name}: ${error ? `FAILED (${error})` : `done in ${secs}s`}`);
+  }
+
+  for (const u of units) {
+    const unit = encodeURIComponent(u.unit);
+    const { sheet } = await api('GET', `/spaces/${space._id}/revision/${unit}`);
+    if (sheet) {
+      log(`revision sheet ${u.unit}: already written`);
+      continue;
+    }
+    const error = await stream(`/spaces/${space._id}/revision/${unit}`, { mode: MODE });
+    log(`revision sheet ${u.unit}: ${error ? `FAILED (${error})` : 'done'}`);
+  }
 }
 
 async function main() {
@@ -163,7 +234,13 @@ async function main() {
   const space = await getSpace();
   await upload(space);
   const documents = await waitUntilProcessed(space);
-  if (documents.some((d) => d.status === 'ready')) await askExample(space);
+  if (documents.some((d) => d.status === 'ready')) {
+    await askExample(space);
+    if (GENERATE) {
+      await answerAll(space);
+      await lessonsAndSheets(space);
+    }
+  }
 
   const a = await api('GET', `/spaces/${space._id}/analysis`);
   log(`analysis: ${a.paperCount} papers, ${a.questionCount} questions, ${a.topics.length} topics, ${a.repeats.length} repeated questions`);
