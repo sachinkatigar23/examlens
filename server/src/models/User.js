@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { isDemoUser } from '../utils/demo.js';
 
 const userSchema = new mongoose.Schema(
   {
@@ -29,6 +30,12 @@ userSchema.set('toJSON', {
     delete ret.passwordHash;
     delete ret.refreshTokens;
     delete ret.tokenVersion;
+    // The public demo account: the client hides upload/edit/delete, and answers default to Cloud (the client
+    // still falls back to Local when Cloud isn't set up). Its own settings are never saved (read-only).
+    if (isDemoUser(ret)) {
+      ret.readOnly = true;
+      ret.settings = { defaultMode: 'cloud', cloudNoticeSeen: true };
+    }
     return ret;
   },
 });

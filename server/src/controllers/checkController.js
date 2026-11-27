@@ -33,6 +33,7 @@ export async function checkAnswer(req, res) {
     onFinish: async ({ text, meta, citations, complete, events }) => {
       const grade = meta?.grade ?? events.grade;
       if (!complete || !grade) return null;
+      if (req.user.demo) return null; // public demo: graded, not saved (visitors share one account)
       const saved = await AnswerCheck.create({
         space,
         user: req.user.id,

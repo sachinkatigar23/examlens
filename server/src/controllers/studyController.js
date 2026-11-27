@@ -5,6 +5,7 @@ import { StudyPlan } from '../models/StudyPlan.js';
 import { Topic } from '../models/Topic.js';
 import { relayAiStream } from '../services/streamRelay.js';
 import { notFound } from '../utils/AppError.js';
+import { alreadyWritten } from '../utils/demo.js';
 
 async function findTopic(req) {
   const { topicId } = req.params;
@@ -54,6 +55,7 @@ export async function getLesson(req, res) {
 export async function generateLesson(req, res) {
   const topic = await findTopic(req);
   const space = req.space._id;
+  if (req.user.demo && (await Lesson.exists({ space, topic: topic._id }))) throw alreadyWritten('lesson');
   await relayAiStream(req, res, {
     path: '/lesson',
     // A topic derived from the question bank (no syllabus) has a list of questions as details, which can

@@ -5,6 +5,7 @@ import { Topic } from '../models/Topic.js';
 import { bankScope, cancelJob, latestJob, saveAnswer, startAnswerAll } from '../services/answerJobService.js';
 import { relayAiStream } from '../services/streamRelay.js';
 import { notFound } from '../utils/AppError.js';
+import { alreadyWritten } from '../utils/demo.js';
 
 const DEFAULT_MARKS = 5;
 
@@ -77,6 +78,7 @@ export async function getAnswer(req, res) {
 // marks-aware answer from the notes, streamed (SSE), then caches it.
 export async function generateAnswer(req, res) {
   const question = await findQuestion(req);
+  if (req.user.demo && (await Answer.exists({ question: question._id }))) throw alreadyWritten('answer');
   const marks = req.body.marks ?? question.marks ?? DEFAULT_MARKS;
   await relayAiStream(req, res, {
     path: '/ask',

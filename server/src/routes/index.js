@@ -7,6 +7,7 @@ import spaceRoutes from './spaceRoutes.js';
 const router = Router();
 
 router.get('/health', healthCtrl.health);
+router.get('/config', healthCtrl.publicConfig);
 router.get('/ai/providers', requireAuth, healthCtrl.providers);
 
 router.use('/auth', authRoutes);

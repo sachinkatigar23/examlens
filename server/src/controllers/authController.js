@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import { User } from '../models/User.js';
+import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
+import { isDemoUser } from '../utils/demo.js';
+import { hasServiceKey } from '../utils/serviceKey.js';
 import { issueTokens } from '../services/authService.js';
 import { REFRESH_COOKIE, clearRefreshCookie, verifyRefreshToken } from '../utils/tokens.js';
 
@@ -10,6 +13,10 @@ const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', BCRYPT_ROUNDS);
 
 export async function register(req, res) {
   const { name, email, password } = req.body;
+  // Public demo: no sign-ups (the seed script still creates the demo account, with the service key).
+  if (env.publicDemo && !hasServiceKey(req)) {
+    throw new AppError(403, 'REGISTRATION_CLOSED', 'Sign-ups are closed on this public demo. Log in with the demo account instead.');
+  }
   if (await User.exists({ email })) {
     throw new AppError(409, 'EMAIL_TAKEN', 'An account with this email already exists');
   }
@@ -54,15 +61,17 @@ export async function refresh(req, res) {
     fail('INVALID_REFRESH_TOKEN', 'Your session has expired, please log in again');
   }
 
-  const known = user.refreshTokens.some((t) => t.jti === payload.jti);
-  if (!known) {
-    user.tokenVersion += 1;
-    user.refreshTokens = [];
-    await user.save();
-    fail('REFRESH_TOKEN_REUSED', 'Your session was ended for safety, please log in again');
+  // The shared demo account's sessions aren't tracked (see services/authService.js), so no reuse check.
+  if (!isDemoUser(user)) {
+    const known = user.refreshTokens.some((t) => t.jti === payload.jti);
+    if (!known) {
+      user.tokenVersion += 1;
+      user.refreshTokens = [];
+      await user.save();
+      fail('REFRESH_TOKEN_REUSED', 'Your session was ended for safety, please log in again');
+    }
+    user.refreshTokens = user.refreshTokens.filter((t) => t.jti !== payload.jti);
   }
-
-  user.refreshTokens = user.refreshTokens.filter((t) => t.jti !== payload.jti);
   const accessToken = await issueTokens(user, res);
   res.json({ user, accessToken });
 }

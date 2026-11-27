@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as auth from '../controllers/authController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { demoReadOnlyGuard } from '../middleware/demoReadOnly.js';
 import { validate } from '../middleware/validate.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { loginSchema, registerSchema } from '../validators/auth.schemas.js';
@@ -15,6 +16,6 @@ router.post('/login', authLimiter, validate(loginSchema), auth.login);
 router.post('/refresh', auth.refresh);
 router.post('/logout', auth.logout);
 router.get('/me', requireAuth, auth.me);
-router.patch('/me/settings', requireAuth, validate(settingsSchema), auth.updateSettings);
+router.patch('/me/settings', requireAuth, demoReadOnlyGuard, validate(settingsSchema), auth.updateSettings);
 
 export default router;

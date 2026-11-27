@@ -41,9 +41,9 @@ export async function stopApp() {
   fs.rmSync(uploadDir, { recursive: true, force: true });
 }
 
-// fetch wrapper: request(method, path, { token, body, form, cookie }) → { status, body, cookie }
-export async function request(method, url, { token, body, form, cookie } = {}) {
-  const headers = {};
+// fetch wrapper: request(method, path, { token, body, form, cookie, headers }) → { status, body, cookie }
+export async function request(method, url, { token, body, form, cookie, headers: extra } = {}) {
+  const headers = { ...extra };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (cookie) headers.Cookie = cookie;
   if (body !== undefined) headers['Content-Type'] = 'application/json';

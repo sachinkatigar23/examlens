@@ -121,6 +121,38 @@
       ]
     },
     {
+      "name": "Public config",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/config",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "config"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Is this the public demo? (PUBLIC_DEMO=true: sign-ups closed, read-only demo account shown on the login page)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('has publicDemo + registrationOpen', () => { const c = pm.response.json(); pm.expect(c.publicDemo).to.be.a('boolean'); pm.expect(c.registrationOpen).to.equal(!c.publicDemo); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "item": [
         {

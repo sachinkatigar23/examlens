@@ -14,6 +14,9 @@ const unitOf = (thread) => (thread.startsWith('study:') ? thread.slice('study:'.
 export async function ask(req, res) {
   const { question, mode, thread, photoId } = req.body;
   const space = req.space._id;
+  // Public demo: every visitor shares one account, so their questions are answered but not saved (otherwise
+  // each visitor would see everyone else's chat). The seeded example conversation stays.
+  const save = !req.user.demo;
   if (photoId && !(await Photo.exists({ _id: photoId, space }))) throw notFound('Photo');
 
   const recent = await Message.find({ space, thread: threadFilter(thread) }).sort({ createdAt: -1 }).limit(HISTORY_MESSAGES).lean();
@@ -29,9 +32,10 @@ export async function ask(req, res) {
       unit: unitOf(thread),
       purpose: photoId ? 'doubt' : 'ask',
     },
-    onStart: () => Message.create({ space, user: req.user.id, role: 'user', content: question, thread, photo: photoId ?? null }),
+    onStart: () => save && Message.create({ space, user: req.user.id, role: 'user', content: question, thread, photo: photoId ?? null }),
     // Save whatever was answered, even if the user stopped it halfway.
     onFinish: async ({ text, meta, citations }) => {
+      if (!save) return null;
       const saved = await Message.create({
         space,
         user: req.user.id,

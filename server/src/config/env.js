@@ -27,6 +27,14 @@ export const env = {
   uploadDir: path.resolve(serverRoot, process.env.UPLOAD_DIR || '../storage/uploads'),
   // Number of proxies in front of the app (1 behind the nginx container) so req.ip is the real client.
   trustProxy: Number(process.env.TRUST_PROXY) || 0,
+
+  // Public demo (docker-compose.prod.yml): sign-ups closed, the demo account is read-only, stricter limits.
+  publicDemo: process.env.PUBLIC_DEMO === 'true',
+  demoEmail: (process.env.DEMO_EMAIL || 'demo@examlens.local').toLowerCase(),
+  demoPassword: process.env.DEMO_PASSWORD || '', // shown on the login page so visitors can get in
+  demoCloudPerIp: Number(process.env.DEMO_CLOUD_PER_IP) || 5, // Cloud answers per visitor IP per day
+  demoAskPerIp: Number(process.env.DEMO_ASK_PER_IP) || 30, // AI answers (any model) per visitor IP per day
+  demoMaxConcurrent: Number(process.env.DEMO_MAX_CONCURRENT) || 2, // answers generated at once (CPU-only box)
 };
 
 export const isProduction = env.nodeEnv === 'production';

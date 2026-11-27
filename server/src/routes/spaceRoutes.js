@@ -9,6 +9,7 @@ import * as checks from '../controllers/checkController.js';
 import * as plans from '../controllers/planController.js';
 import * as revision from '../controllers/revisionController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { demoReadOnlyGuard } from '../middleware/demoReadOnly.js';
 import { requireSpaceOwner } from '../middleware/requireSpaceOwner.js';
 import { validate } from '../middleware/validate.js';
 import { askLimiter } from '../middleware/rateLimit.js';
@@ -25,6 +26,7 @@ import documentRoutes from './documentRoutes.js';
 const router = Router();
 
 router.use(requireAuth);
+router.use(demoReadOnlyGuard); // public demo account: read-only except Ask / Check / missing answers
 
 router.get('/', spaces.listSpaces);
 router.post('/', validate(createSpaceSchema), spaces.createSpace);

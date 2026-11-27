@@ -1,11 +1,14 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { cookieSecure, env } from '../config/env.js';
+import { isDemoUser } from './demo.js';
 
 export const REFRESH_COOKIE = 'refreshToken';
 
+// demo: true marks the shared public-demo account, which requireAuth treats as read-only.
 export function signAccessToken(user) {
-  return jwt.sign({ sub: user.id, name: user.name }, env.jwtAccessSecret, {
+  const claims = { sub: user.id, name: user.name, ...(isDemoUser(user) ? { demo: true } : {}) };
+  return jwt.sign(claims, env.jwtAccessSecret, {
     expiresIn: env.accessTokenTtl,
   });
 }

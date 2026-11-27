@@ -3,6 +3,7 @@ import { RevisionSheet } from '../models/RevisionSheet.js';
 import { Topic } from '../models/Topic.js';
 import { relayAiStream } from '../services/streamRelay.js';
 import { notFound } from '../utils/AppError.js';
+import { alreadyWritten } from '../utils/demo.js';
 
 const TOP_QUESTIONS = 10;
 
@@ -49,6 +50,7 @@ export async function getSheet(req, res) {
 export async function generateSheet(req, res) {
   const { unit, topics } = await unitTopics(req);
   const space = req.space._id;
+  if (req.user.demo && (await RevisionSheet.exists({ space, unit }))) throw alreadyWritten('revision sheet');
   await relayAiStream(req, res, {
     path: '/revision-sheet',
     body: { space_id: String(space), unit, unit_title: topics[0].unitTitle, topics: topics.map((t) => t.name), mode: req.body.mode },
