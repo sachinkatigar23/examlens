@@ -6,6 +6,7 @@ import ModeToggle from './ModeToggle.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ModelProvider, useModels } from '../context/ModelContext.jsx';
 import { useReadOnly } from '../hooks/usePublicConfig.js';
+import { STATIC_DEMO } from '../static/mode.js';
 
 export default function AppLayout() {
   return (
@@ -27,14 +28,17 @@ function AppShell() {
             <span className="hidden text-sm text-ink-muted md:inline">{user?.name}</span>
             {!readOnly && <DefaultModel />}
             <ThemeToggle />
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-ink-muted hover:bg-ink/5 hover:text-ink"
-              aria-label="Log out"
-            >
-              <LogOut size={16} aria-hidden="true" />
-              <span className="hidden sm:inline">Log out</span>
-            </button>
+            {/* The static demo has no accounts, so nothing to log out of. */}
+            {!STATIC_DEMO && (
+              <button
+                onClick={logout}
+                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-ink-muted hover:bg-ink/5 hover:text-ink"
+                aria-label="Log out"
+              >
+                <LogOut size={16} aria-hidden="true" />
+                <span className="hidden sm:inline">Log out</span>
+              </button>
+            )}
           </div>
         </div>
       </header>

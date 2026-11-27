@@ -230,7 +230,7 @@ export default function CheckTab({ spaceId }) {
         {run && <CheckResult run={run} onUseCloud={() => check('cloud')} />}
       </div>
 
-      <Attempts attempts={attempts} activeId={run?.attemptId} onOpen={openAttempt} onDelete={removeAttempt} typed={!questionId} />
+      <Attempts attempts={attempts} activeId={run?.attemptId} onOpen={openAttempt} onDelete={readOnly ? null : removeAttempt} typed={!questionId} />
     </div>
   );
 }
@@ -543,9 +543,11 @@ function Attempts({ attempts, activeId, onOpen, onDelete, typed }) {
                 </span>
               </span>
             </button>
-            <button onClick={() => onDelete(a._id)} className="rounded p-1 text-ink-muted hover:text-pen" aria-label="Delete this attempt">
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
+            {onDelete && (
+              <button onClick={() => onDelete(a._id)} className="rounded p-1 text-ink-muted hover:text-pen" aria-label="Delete this attempt">
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            )}
           </li>
         ))}
       </ul>

@@ -1,9 +1,13 @@
 import axios from 'axios';
+import { STATIC_DEMO } from '../static/mode.js';
+import { staticAdapter } from '../static/adapter.js';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 // withCredentials sends the httpOnly refresh cookie to the API (different port = different origin).
 export const api = axios.create({ baseURL: API_URL, withCredentials: true });
+// Static demo (GitHub Pages): no server, answers come from exported JSON files.
+if (STATIC_DEMO) api.defaults.adapter = staticAdapter;
 
 // The access token lives only in memory (never localStorage), so a page reload starts by refreshing.
 let accessToken = null;

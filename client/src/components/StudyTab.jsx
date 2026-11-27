@@ -14,6 +14,7 @@ import { getLesson, getStudyPlan, setStudied, streamLesson } from '../api/study.
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
 import { useReadOnly } from '../hooks/usePublicConfig.js';
+import { STATIC_DEMO } from '../static/mode.js';
 
 const STATUS = {
   not_started: { label: 'Not started', Icon: CircleDashed, className: 'text-ink-muted' },
@@ -142,7 +143,8 @@ export default function StudyTab({ spaceId }) {
 
   return (
     <>
-    {!readOnly && (
+    {/* The static demo shows its recorded plan (changes get the read-only message). */}
+    {(!readOnly || STATIC_DEMO) && (
       <PlanPanel
         spaceId={spaceId}
         refreshKey={planKey}

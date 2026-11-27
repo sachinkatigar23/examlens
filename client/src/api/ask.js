@@ -1,5 +1,7 @@
 import { API_URL, api, getAccessToken, refreshSession } from './client.js';
 import { cloudUsed } from './settings.js';
+import { STATIC_DEMO } from '../static/mode.js';
+import { recordedConversations, replayStream } from '../static/replay.js';
 
 // thread: 'ask' (the Ask tab) or 'study:<unit>' (follow-up chat under a lesson)
 export const listMessages = (spaceId, thread = 'ask') =>
@@ -38,6 +40,7 @@ async function* readEvents(body) {
 // axios can't read a response while it is still arriving, so this uses fetch. EventSource can't either:
 // it only does GET and can't send the Authorization header.
 export async function streamPost(path, body, handlers) {
+  if (STATIC_DEMO) return replayStream(path, body, handlers); // recorded answers only, no live AI
   try {
     return await streamOnce(path, body, handlers);
   } finally {
@@ -84,3 +87,7 @@ async function streamOnce(path, body, { onToken, onEvent, signal }) {
 // Ask a question. Resolves with { citations, provider, model, marks, messageId }.
 export const streamAnswer = (spaceId, { question, mode, thread, photoId }, handlers) =>
   streamPost(`/spaces/${spaceId}/ask`, { question, mode, thread, photoId }, handlers);
+
+// Static demo only: the questions that have a recorded answer, shown as suggestions in Ask.
+export const listRecordedQuestions = (spaceId) =>
+  STATIC_DEMO ? recordedConversations(spaceId).then((list) => list.map((c) => c.question)) : Promise.resolve([]);

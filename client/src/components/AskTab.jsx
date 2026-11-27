@@ -8,7 +8,8 @@ import ModeToggle from './ModeToggle.jsx';
 import ModelBadge from './ModelBadge.jsx';
 import AnswerError from './AnswerError.jsx';
 import SnapDoubt, { PhotoThumb } from './SnapDoubt.jsx';
-import { clearMessages, listMessages, streamAnswer } from '../api/ask.js';
+import { clearMessages, listMessages, listRecordedQuestions, streamAnswer } from '../api/ask.js';
+import { STATIC_DEMO } from '../static/mode.js';
 import { getAnalysis } from '../api/analysis.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
@@ -43,8 +44,11 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
         setError(errorMessage(err));
         setMessages([]);
       });
-    // Suggest questions about the topics exams ask most (if papers are analysed already).
-    if (isAskTab) {
+    // Static demo: the suggestions are the questions with a recorded answer (replayed, not generated).
+    if (isAskTab && STATIC_DEMO) {
+      listRecordedQuestions(spaceId).then(setSuggestions).catch(() => {});
+    } else if (isAskTab) {
+      // Suggest questions about the topics exams ask most (if papers are analysed already).
       getAnalysis(spaceId)
         .then((a) => setSuggestions(a.hotTopics.slice(0, 3).map((t) => `Explain ${t.name.toLowerCase()} for 10 marks`)))
         .catch(() => {});
@@ -82,7 +86,7 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
         { signal: controller.signal, onToken: (t) => patchLast((m) => ({ content: m.content + t })) },
       );
       // done.content = the answer with page citations added to lines that had none.
-      patchLast({ ...(done.content ? { content: done.content } : {}), citations: done.citations ?? [], provider: done.provider, model: done.model, marks: done.marks, pending: false });
+      patchLast({ ...(done.content ? { content: done.content } : {}), citations: done.citations ?? [], provider: done.provider, model: done.model, marks: done.marks, recorded: done.recorded, pending: false });
     } catch (err) {
       if (err.name === 'AbortError') patchLast({ pending: false, stopped: true });
       else patchLast({ pending: false, error: { message: err.message, code: err.code } });
@@ -150,6 +154,12 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
         </ol>
       )}
       <div ref={endRef} />
+
+      {STATIC_DEMO && isAskTab && messages.length > 0 && !streaming && (
+        <div className="mt-6">
+          <StarterChips starters={suggestions.filter((s) => !messages.some((m) => m.role === 'user' && m.content === s))} onPick={ask} />
+        </div>
+      )}
 
       {snapping && (
         <SnapDoubt
@@ -262,6 +272,11 @@ function Answer({ message, onUseCloud }) {
 
       {!message.pending && (message.provider || uniqueSources?.length > 0) && (
         <footer className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-rule pt-3 text-xs text-ink-muted">
+          {message.recorded && (
+            <span className="rounded-sm bg-highlight/70 px-1.5 py-px font-mono text-[10px] tracking-wider text-[#1B2A4A] uppercase">
+              Recorded answer
+            </span>
+          )}
           <ModelBadge provider={message.provider} model={message.model} />
           {uniqueSources?.length > 0 && <span>From your notes:</span>}
           {uniqueSources?.map((c) => (

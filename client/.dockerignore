@@ -3,3 +3,5 @@ dist
 .env
 .env.*
 !.env.example
+# the GitHub Pages demo data (only the static build uses it)
+public/static-demo
