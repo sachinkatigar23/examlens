@@ -4,6 +4,9 @@
 
 > **Know what's coming. Study what matters.**
 
+**[▶ Live demo](https://sachinkatigar23.github.io/examlens/)**: a read-only copy of the demo notebook (recorded
+answers, no live AI), straight in without an account.
+
 ExamLens is a private exam tutor for university students. Upload one subject's **syllabus**, **unit notes**, **past
 papers** and the college's **"important questions"** PDF. ExamLens shows which topics come up year after year,
 **teaches each unit from scratch**, writes an **exam answer for every important question, sized to its marks**, and
@@ -216,6 +219,14 @@ a year like `2023` → past paper of that year, anything else → notes (`unit3`
 
 Only port 8080 (plus MongoDB and Qdrant for dev mode) is published. The API and the AI service are reachable only
 inside the Docker network.
+
+### Static demo (GitHub Pages)
+
+The [live demo](https://sachinkatigar23.github.io/examlens/) is the React app built with `VITE_STATIC_DEMO=true`
+(`npm run build:pages` in `client/`): no server and no login. The API layer reads JSON exported from a real demo
+notebook, Ask replays recorded answers, and anything that would write or need live AI says so. To refresh the data,
+seed the demo on a running stack, then `node scripts/export-static-demo.mjs` (writes `client/public/static-demo/`)
+and commit it; [.github/workflows/pages.yml](.github/workflows/pages.yml) deploys every push to `main`.
 
 ### Public deployment (demo server)
 
