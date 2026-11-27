@@ -5,10 +5,12 @@ import ModelBadge from './ModelBadge.jsx';
 import AnswerError from './AnswerError.jsx';
 import { getAnswer, streamExamAnswer } from '../api/bank.js';
 import { errorMessage } from '../api/client.js';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 // The marks-aware exam answer for one stored question (question bank or past paper). Shows the cached answer;
 // otherwise writes it (streamed) and the server caches it. "Regenerate" replaces it.
 export default function ExamAnswer({ spaceId, question, mode, onSaved }) {
+  const readOnly = useReadOnly();
   const [answer, setAnswer] = useState(undefined); // undefined = loading, null = none yet
   const [streamText, setStreamText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -79,12 +81,14 @@ export default function ExamAnswer({ spaceId, question, mode, onSaved }) {
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
           {answer && <ModelBadge provider={answer.provider} model={answer.model} marks={answer.marks} />}
           {marksChanged && <span className="text-xs text-pen">Written for {answer.marks} marks; marks are now {question.marks}.</span>}
-          <button
-            onClick={() => generate()}
-            className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink"
-          >
-            <RefreshCw size={12} aria-hidden="true" /> {answer ? 'Regenerate' : 'Try again'}
-          </button>
+          {!(readOnly && answer) && (
+            <button
+              onClick={() => generate()}
+              className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink"
+            >
+              <RefreshCw size={12} aria-hidden="true" /> {answer ? 'Regenerate' : 'Try again'}
+            </button>
+          )}
         </div>
       )}
     </div>

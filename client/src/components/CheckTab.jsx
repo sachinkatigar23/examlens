@@ -14,6 +14,7 @@ import { transcribePhoto, uploadPhoto } from '../api/photos.js';
 import { errorMessage } from '../api/client.js';
 import { useModels } from '../context/ModelContext.jsx';
 import { formatDate, formatBytes } from '../utils/format.js';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 const MARK_OPTIONS = [2, 5, 10, 16];
 const WORD_TARGET = { 2: '40–70', 5: '150–250', 10: '350–500', 16: '600–800' };
@@ -25,6 +26,7 @@ const MAX_IMAGE = 10 * 1024 * 1024;
 // Check my answer: pick (or type) a question, write or photograph your own answer, and get an estimated
 // mark, what's covered and missing, and a full-marks version from your notes. Every attempt is kept.
 export default function CheckTab({ spaceId }) {
+  const readOnly = useReadOnly();
   const { providers } = useModels();
   const [params, setParams] = useSearchParams();
   const [bank, setBank] = useState(null);
@@ -189,7 +191,9 @@ export default function CheckTab({ spaceId }) {
 
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-rule pt-4" role="tablist" aria-label="How to give your answer">
             <SourceTab active={source === 'type'} onClick={() => pickSource('type')} Icon={Keyboard} label="Type it" />
-            <SourceTab active={source === 'photo'} onClick={() => pickSource('photo')} Icon={Camera} label="Photo of my answer" />
+            {!readOnly && (
+              <SourceTab active={source === 'photo'} onClick={() => pickSource('photo')} Icon={Camera} label="Photo of my answer" />
+            )}
           </div>
 
           {source === 'photo' && (

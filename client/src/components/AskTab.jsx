@@ -12,6 +12,7 @@ import { clearMessages, listMessages, streamAnswer } from '../api/ask.js';
 import { getAnalysis } from '../api/analysis.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 const NOT_FOUND_PREFIX = "I couldn't find this in your notes";
 
@@ -33,6 +34,7 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
   const abortRef = useRef(null);
   const endRef = useRef(null);
   const isAskTab = thread === 'ask';
+  const readOnly = useReadOnly(); // public demo: no photos, no clearing the shared example chat
 
   useEffect(() => {
     listMessages(spaceId, thread)
@@ -108,7 +110,7 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <ModeToggle mode={mode} onChange={setMode} />
-        {messages.length > 0 && (
+        {!readOnly && messages.length > 0 && (
           <button
             onClick={handleClear}
             disabled={streaming}
@@ -183,7 +185,7 @@ export default function AskTab({ spaceId, thread = 'ask', compact = false, place
           placeholder={placeholder ?? 'Ask from your notes… e.g. Explain BFS for 10 marks'}
           className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-base text-ink placeholder:text-ink-muted/70 focus:outline-none field-sizing-content"
         />
-        {isAskTab && !streaming && (
+        {isAskTab && !streaming && !readOnly && (
           <button
             type="button"
             onClick={() => setSnapping(true)}

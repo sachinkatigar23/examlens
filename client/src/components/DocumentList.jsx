@@ -12,7 +12,7 @@ const GROUPS = [
   { kind: 'important', title: 'Important questions', empty: "Your college's question bank PDF: every question gets an exam answer from your notes." },
 ];
 
-export default function DocumentList({ documents, onDelete, onRetry }) {
+export default function DocumentList({ documents, onDelete, onRetry, readOnly = false }) {
   const [toDelete, setToDelete] = useState(null);
 
   return (
@@ -33,7 +33,7 @@ export default function DocumentList({ documents, onDelete, onRetry }) {
               <ul className="mt-2 divide-y divide-rule border-y border-rule">
                 <AnimatePresence initial={false}>
                   {docs.map((doc) => (
-                    <DocumentRow key={doc._id} doc={doc} onDelete={() => setToDelete(doc)} onRetry={() => onRetry(doc)} />
+                    <DocumentRow key={doc._id} doc={doc} readOnly={readOnly} onDelete={() => setToDelete(doc)} onRetry={() => onRetry(doc)} />
                   ))}
                 </AnimatePresence>
               </ul>
@@ -60,7 +60,7 @@ const canRetry = (doc) =>
   doc.status === 'failed' ||
   (['queued', 'processing'].includes(doc.status) && Date.now() - new Date(doc.updatedAt).getTime() > STALE_MS);
 
-function DocumentRow({ doc, onDelete, onRetry }) {
+function DocumentRow({ doc, onDelete, onRetry, readOnly }) {
   const [retrying, setRetrying] = useState(false);
   const meta = [
     doc.kind === 'paper' && doc.year,
@@ -85,7 +85,7 @@ function DocumentRow({ doc, onDelete, onRetry }) {
           <p className="font-mono text-xs text-ink-muted">{meta.join(' · ')}</p>
         </div>
         <StatusChip status={doc.status} />
-        {canRetry(doc) && (
+        {!readOnly && canRetry(doc) && (
           <button
             onClick={async () => {
               setRetrying(true);
@@ -100,13 +100,15 @@ function DocumentRow({ doc, onDelete, onRetry }) {
             <span className="hidden sm:inline">Retry</span>
           </button>
         )}
-        <button
-          onClick={onDelete}
-          className="rounded-md p-2 text-ink-muted transition-colors hover:bg-pen/10 hover:text-pen"
-          aria-label={`Remove ${doc.originalName}`}
-        >
-          <Trash2 size={16} aria-hidden="true" />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={onDelete}
+            className="rounded-md p-2 text-ink-muted transition-colors hover:bg-pen/10 hover:text-pen"
+            aria-label={`Remove ${doc.originalName}`}
+          >
+            <Trash2 size={16} aria-hidden="true" />
+          </button>
+        )}
       </div>
       {doc.status === 'failed' && doc.error && (
         <p className="mt-1.5 ml-8 border-l-2 border-pen pl-3 text-sm text-pen">{doc.error}</p>

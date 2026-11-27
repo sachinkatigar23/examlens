@@ -6,6 +6,7 @@ import Button from '../components/Button.jsx';
 import FormError from '../components/FormError.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { errorMessage } from '../api/client.js';
+import { usePublicConfig } from '../hooks/usePublicConfig.js';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -13,6 +14,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { registrationOpen } = usePublicConfig();
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
@@ -29,6 +31,8 @@ export default function RegisterPage() {
       setBusy(false);
     }
   }
+
+  if (!registrationOpen) return <RegistrationClosed />;
 
   return (
     <AuthLayout>
@@ -59,6 +63,26 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
+    </AuthLayout>
+  );
+}
+
+// Public demo: no new accounts. Visitors use the shared, read-only demo account.
+function RegistrationClosed() {
+  return (
+    <AuthLayout>
+      <h2 className="text-3xl font-semibold">Sign-ups are closed.</h2>
+      <p className="mt-2 text-ink-muted">
+        This is a public demo of ExamLens. Log in with the demo account to look around: a Computer Networks notebook
+        with sample past papers, answers, lessons and revision sheets. To use your own notes, run ExamLens on your own
+        machine (it's free and stays offline).
+      </p>
+      <Link
+        to="/login"
+        className="mt-8 inline-flex items-center rounded-md bg-ink px-4 py-2.5 font-medium text-paper hover:bg-ink/90"
+      >
+        Go to the demo login
+      </Link>
     </AuthLayout>
   );
 }

@@ -15,6 +15,7 @@ import Button from '../components/Button.jsx';
 import FormError from '../components/FormError.jsx';
 import { deleteSpace, getSpace, updateSpace } from '../api/spaces.js';
 import { errorMessage } from '../api/client.js';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 const TABS = [
   { id: 'documents', label: 'Documents' },
@@ -26,6 +27,7 @@ const TABS = [
 ];
 
 export default function SpacePage() {
+  const readOnly = useReadOnly();
   const { spaceId } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -64,7 +66,7 @@ export default function SpacePage() {
           <h1 className="text-3xl font-semibold sm:text-4xl">{space.name}</h1>
           {space.subject && <p className="mt-1 text-ink-muted">{space.subject}</p>}
         </div>
-        <div className="flex gap-1">
+        <div className={`flex gap-1 ${readOnly ? 'hidden' : ''}`}>
           <Button variant="ghost" onClick={() => setEditing(true)}>
             <Pencil size={16} aria-hidden="true" /> Edit
           </Button>

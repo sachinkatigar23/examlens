@@ -11,6 +11,7 @@ import { moveQuestion } from '../api/analysis.js';
 import { getBank, getJob, setMarks, startAnswerAll, stopJob } from '../api/bank.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 const MARK_OPTIONS = [2, 5, 10, 16];
 const NO_UNIT = 'Other questions';
@@ -24,6 +25,7 @@ export default function QuestionBankTab({ spaceId }) {
   const [error, setError] = useState('');
   const [unit, setUnit] = useState(''); // '' = all units
   const [mode, setMode] = useModeState();
+  const readOnly = useReadOnly(); // public demo: answers are pre-written, no "Answer all"
   const [job, setJob] = useState(null);
 
   const load = useCallback(
@@ -109,7 +111,7 @@ export default function QuestionBankTab({ spaceId }) {
         </label>
         <ModeToggle mode={mode} onChange={setMode} />
         <div className="ml-auto flex flex-wrap gap-2">
-          {running ? (
+          {readOnly ? null : running ? (
             <Button variant="secondary" onClick={stop}>
               <Square size={14} aria-hidden="true" /> Stop
             </Button>
@@ -188,6 +190,7 @@ function QuestionRow({ spaceId, question, topics, mode, onChange }) {
   const [open, setOpen] = useState(false);
   const [moving, setMoving] = useState(false);
   const [saving, setSaving] = useState(false);
+  const readOnly = useReadOnly();
   useEffect(() => setQ(question), [question]);
 
   async function changeMarks(marks) {
@@ -216,7 +219,7 @@ function QuestionRow({ spaceId, question, topics, mode, onChange }) {
           <select
             id={`marks-${q._id}`}
             value={q.marks ?? 5}
-            disabled={saving}
+            disabled={saving || readOnly}
             onChange={(e) => changeMarks(Number(e.target.value))}
             title={q.marksEdited ? 'Marks set by you' : q.marks ? 'Marks from the PDF' : 'No marks in the PDF: 5 assumed'}
             className="rounded-sm border border-pen/40 bg-transparent px-1 py-px font-mono text-xs text-pen"
@@ -236,7 +239,7 @@ function QuestionRow({ spaceId, question, topics, mode, onChange }) {
             Exam answer
             <ChevronDown size={12} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
-          {topics.length > 0 && (
+          {!readOnly && topics.length > 0 && (
             <button
               onClick={() => setMoving((m) => !m)}
               aria-expanded={moving}

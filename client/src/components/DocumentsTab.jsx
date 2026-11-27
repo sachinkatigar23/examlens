@@ -5,8 +5,10 @@ import FormError from './FormError.jsx';
 import { useDocuments } from '../hooks/useDocuments.js';
 import { deleteDocument, retryDocument } from '../api/documents.js';
 import { errorMessage } from '../api/client.js';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 export default function DocumentsTab({ spaceId }) {
+  const readOnly = useReadOnly();
   const { documents, error, setDocuments } = useDocuments(spaceId);
   const [actionError, setActionError] = useState('');
 
@@ -35,16 +37,18 @@ export default function DocumentsTab({ spaceId }) {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[22rem_1fr] lg:items-start">
-      <div className="lg:sticky lg:top-6">
-        <UploadTray spaceId={spaceId} onUploaded={handleUploaded} />
-      </div>
+    <div className={readOnly ? '' : 'grid gap-8 lg:grid-cols-[22rem_1fr] lg:items-start'}>
+      {!readOnly && (
+        <div className="lg:sticky lg:top-6">
+          <UploadTray spaceId={spaceId} onUploaded={handleUploaded} />
+        </div>
+      )}
       <div>
         <FormError message={error || actionError} />
         {documents === null ? (
           !error && <p className="font-mono text-sm text-ink-muted" role="status">Opening the folder…</p>
         ) : (
-          <DocumentList documents={documents} onDelete={handleDelete} onRetry={handleRetry} />
+          <DocumentList documents={documents} onDelete={handleDelete} onRetry={handleRetry} readOnly={readOnly} />
         )}
       </div>
     </div>

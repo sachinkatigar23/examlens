@@ -5,6 +5,7 @@ import ThemeToggle from './ThemeToggle.jsx';
 import ModeToggle from './ModeToggle.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { ModelProvider, useModels } from '../context/ModelContext.jsx';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 export default function AppLayout() {
   return (
@@ -16,6 +17,7 @@ export default function AppLayout() {
 
 function AppShell() {
   const { user, logout } = useAuth();
+  const readOnly = useReadOnly();
   return (
     <div className="min-h-dvh">
       <header className="no-print border-b border-rule bg-paper/85 backdrop-blur-sm">
@@ -23,7 +25,7 @@ function AppShell() {
           <Logo />
           <div className="flex items-center gap-1 sm:gap-3">
             <span className="hidden text-sm text-ink-muted md:inline">{user?.name}</span>
-            <DefaultModel />
+            {!readOnly && <DefaultModel />}
             <ThemeToggle />
             <button
               onClick={logout}

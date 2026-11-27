@@ -11,8 +11,10 @@ import RedPenUnderline from '../components/RedPenUnderline.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { createSpace, listSpaces } from '../api/spaces.js';
 import { errorMessage } from '../api/client.js';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 export default function DashboardPage() {
+  const readOnly = useReadOnly();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [spaces, setSpaces] = useState(null); // null = still loading
@@ -48,9 +50,11 @@ export default function DashboardPage() {
             keeps getting asked.
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus size={18} aria-hidden="true" /> New notebook
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => setCreating(true)}>
+            <Plus size={18} aria-hidden="true" /> New notebook
+          </Button>
+        )}
       </div>
 
       <div className="mt-6">

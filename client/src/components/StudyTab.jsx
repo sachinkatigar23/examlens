@@ -13,6 +13,7 @@ import PlanPanel from './PlanPanel.jsx';
 import { getLesson, getStudyPlan, setStudied, streamLesson } from '../api/study.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
+import { useReadOnly } from '../hooks/usePublicConfig.js';
 
 const STATUS = {
   not_started: { label: 'Not started', Icon: CircleDashed, className: 'text-ink-muted' },
@@ -23,6 +24,7 @@ const STATUS = {
 // Study mode: pick a unit, see its syllabus topics, and let ExamLens teach them from scratch, topic by topic,
 // from your own notes. Lessons are saved, so each is written once (unless you regenerate it).
 export default function StudyTab({ spaceId }) {
+  const readOnly = useReadOnly();
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState('');
   const [unitName, setUnitName] = useState(null);
@@ -140,12 +142,14 @@ export default function StudyTab({ spaceId }) {
 
   return (
     <>
-    <PlanPanel
-      spaceId={spaceId}
-      refreshKey={planKey}
-      onChanged={loadPlan}
-      onOpenTopic={(id, u) => !busy && (setUnitName(u), setTopicId(id))}
-    />
+    {!readOnly && (
+      <PlanPanel
+        spaceId={spaceId}
+        refreshKey={planKey}
+        onChanged={loadPlan}
+        onOpenTopic={(id, u) => !busy && (setUnitName(u), setTopicId(id))}
+      />
+    )}
     <div className="grid gap-8 lg:grid-cols-[17rem_1fr] lg:items-start">
       {/* Units, like the index of a notebook */}
       <nav aria-label="Units" className="space-y-2 lg:sticky lg:top-6">
@@ -264,22 +268,26 @@ export default function StudyTab({ spaceId }) {
               {lesson && live?.topicId !== topic._id && (
                 <footer className="mt-5 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
                   <ModelBadge provider={lesson.provider} model={lesson.model} />
-                  <button
-                    onClick={toggleStudied}
-                    className={`ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${
-                      topic.status === 'studied' ? 'border-pen text-pen' : 'border-ink/25 text-ink hover:border-ink/60'
-                    }`}
-                    aria-pressed={topic.status === 'studied'}
-                  >
-                    <Check size={13} aria-hidden="true" /> {topic.status === 'studied' ? 'Studied' : 'Mark as studied'}
-                  </button>
-                  <button
-                    onClick={() => teach(topic)}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink disabled:opacity-50"
-                  >
-                    <RefreshCw size={12} aria-hidden="true" /> Regenerate
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={toggleStudied}
+                        className={`ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${
+                          topic.status === 'studied' ? 'border-pen text-pen' : 'border-ink/25 text-ink hover:border-ink/60'
+                        }`}
+                        aria-pressed={topic.status === 'studied'}
+                      >
+                        <Check size={13} aria-hidden="true" /> {topic.status === 'studied' ? 'Studied' : 'Mark as studied'}
+                      </button>
+                      <button
+                        onClick={() => teach(topic)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-ink/5 hover:text-ink disabled:opacity-50"
+                      >
+                        <RefreshCw size={12} aria-hidden="true" /> Regenerate
+                      </button>
+                    </>
+                  )}
                 </footer>
               )}
             </motion.section>
