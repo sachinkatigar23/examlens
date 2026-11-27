@@ -1,4 +1,5 @@
 import { API_URL, api, getAccessToken, refreshSession } from './client.js';
+import { cloudUsed } from './settings.js';
 
 // thread: 'ask' (the Ask tab) or 'study:<unit>' (follow-up chat under a lesson)
 export const listMessages = (spaceId, thread = 'ask') =>
@@ -36,7 +37,15 @@ async function* readEvents(body) {
 // POSTs to a streaming route and calls onToken(text) for every piece; resolves with the final "done" data.
 // axios can't read a response while it is still arriving, so this uses fetch. EventSource can't either:
 // it only does GET and can't send the Authorization header.
-export async function streamPost(path, body, { onToken, signal }) {
+export async function streamPost(path, body, handlers) {
+  try {
+    return await streamOnce(path, body, handlers);
+  } finally {
+    cloudUsed(body.mode); // refreshes the Cloud quota shown in the UI
+  }
+}
+
+async function streamOnce(path, body, { onToken, onEvent, signal }) {
   const send = () =>
     fetch(`${API_URL}${path}`, {
       method: 'POST',
@@ -67,6 +76,7 @@ export async function streamPost(path, body, { onToken, signal }) {
     if (event === 'token') onToken(data.text);
     else if (event === 'done') return data;
     else if (event === 'error') throw new StreamError(data.message, data.code);
+    else onEvent?.(event, data); // e.g. "grade" before a checked answer's improved version
   }
   throw new StreamError('The answer was cut off. Please try again.', 'cut_off');
 }

@@ -19,8 +19,13 @@ class Settings(BaseSettings):
     # Cloud mode (optional). No key -> Cloud is shown as unavailable, everything else works.
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
+    # Free-tier requests per day for GEMINI_MODEL (measured 20/day on the free tier). Only used to show
+    # "about N left today"; 0 = don't show a number.
+    gemini_daily_limit: int = 20
     # Optional local vision model for "Snap a doubt", e.g. qwen2.5vl:3b (slower, weaker on handwriting).
     vision_model_local: str = ""
+    # Small runtime state (today's Cloud usage). Relative paths are relative to ai-service/.
+    state_dir: str = "data"
 
     # Retrieval / matching thresholds (cosine similarity, nomic-embed-text). Measured, see docs/BUILD_NOTES.md.
     ask_min_score: float = 0.55  # below this the best chunk isn't really about the question
@@ -38,6 +43,11 @@ class Settings(BaseSettings):
     def upload_path(self) -> Path:
         # Relative paths are relative to ai-service/, matching how the Node server resolves its UPLOAD_DIR.
         path = Path(self.upload_dir)
+        return path if path.is_absolute() else (SERVICE_ROOT / path).resolve()
+
+    @property
+    def state_path(self) -> Path:
+        path = Path(self.state_dir)
         return path if path.is_absolute() else (SERVICE_ROOT / path).resolve()
 
 

@@ -56,6 +56,7 @@ services:
     volumes:
       # Same folder as dev mode (../storage/uploads), so a file uploaded in either mode works in both.
       - ./storage/uploads:/data/uploads:ro
+      - ai_state:/app/data # today's Cloud (Gemini) usage, kept across restarts
     extra_hosts:
       - "host.docker.internal:host-gateway" # needed on Linux; Docker Desktop has it already
     depends_on:
@@ -129,3 +130,4 @@ services:
 volumes:
   mongo_data:
   qdrant_data:
+  ai_state:

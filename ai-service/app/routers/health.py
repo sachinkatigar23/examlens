@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from app.config import settings
 from app.deps import require_service_key
 from app.services import qdrant
-from app.services.llm import installed_models
+from app.services.llm import installed_models, quota
 
 router = APIRouter()
 
@@ -32,7 +32,12 @@ async def providers():
     vision_local = bool(settings.vision_model_local) and settings.vision_model_local in installed
     return {
         "local": {"available": settings.chat_model in installed, "model": settings.chat_model},
-        "cloud": {"available": bool(settings.gemini_api_key), "model": settings.gemini_model},
+        "cloud": {
+            "available": bool(settings.gemini_api_key),
+            "model": settings.gemini_model,
+            # Today's usage (an estimate: Gemini doesn't report the remaining free quota), see llm/quota.py
+            "quota": quota.status(settings.gemini_model) if settings.gemini_api_key else None,
+        },
         "vision": {
             "local": vision_local,
             "localModel": settings.vision_model_local or None,

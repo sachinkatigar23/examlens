@@ -1,4 +1,5 @@
 import { api } from './client.js';
+import { cloudUsed } from './settings.js';
 
 export function uploadPhoto(spaceId, file, onProgress) {
   const form = new FormData();
@@ -11,8 +12,12 @@ export function uploadPhoto(spaceId, file, onProgress) {
 }
 
 // Vision can take a while (a minute or more for a local model), hence the long timeout.
-export const transcribePhoto = (spaceId, photoId, mode) =>
-  api.post(`/spaces/${spaceId}/photos/${photoId}/transcribe`, { mode }, { timeout: 600_000 }).then((r) => r.data);
+// purpose: 'doubt' (a question/code to solve) or 'answer' (the student's own written answer, for Check my answer)
+export const transcribePhoto = (spaceId, photoId, mode, purpose = 'doubt') =>
+  api
+    .post(`/spaces/${spaceId}/photos/${photoId}/transcribe`, { mode, purpose }, { timeout: 600_000 })
+    .then((r) => r.data)
+    .finally(() => cloudUsed(mode));
 
 // The image needs the access token, so it is fetched as a blob and shown through an object URL.
 export const photoBlobUrl = (spaceId, photoId) =>

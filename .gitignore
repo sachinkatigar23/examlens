@@ -26,3 +26,6 @@ Thumbs.db
 
 # your own test PDFs (syllabus, notes, past papers)
 samples/
+
+# AI service runtime state (Cloud usage counter)
+ai-service/data/

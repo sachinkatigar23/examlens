@@ -6,6 +6,7 @@ Whole PDFs are never sent: ingestion always runs locally.
 
 import asyncio
 import re
+from datetime import UTC, datetime
 from collections.abc import AsyncIterator
 
 import httpx
@@ -14,6 +15,7 @@ from google.genai import errors, types
 from pydantic import ValidationError
 
 from app.config import settings
+from app.services.llm import quota
 from app.services.llm.base import LLMError, LLMProvider, T
 
 _client: genai.Client | None = None
@@ -28,9 +30,27 @@ HTTP_TIMEOUT_MS = 120_000
 RETRY_DELAYS = (1.5, 4.0)
 
 
-async def _retrying(call):
+def _reset_text(when: datetime) -> str:
+    """For error messages. The UI shows the exact reset time (in local time) from /providers."""
+    hours = max(round((when - datetime.now(UTC)).total_seconds() / 3600), 1)
+    return f"resets in about {hours} h"
+
+
+def _before_call(model: str) -> None:
+    """Counts the request for the quota display, or refuses straight away (without spending a request)
+    while today's free limit is known to be used up."""
+    state = quota.status(model)
+    if state["exhausted"]:
+        when = datetime.fromisoformat(state["resetsAt"])
+        raise LLMError(f"Gemini's free daily limit for {model} is used up ({_reset_text(when)}). "
+                       "Use Local, or set another GEMINI_MODEL", "rate_limited")
+    quota.record_request(model)
+
+
+async def _retrying(call, model: str):
     for delay in (*RETRY_DELAYS, None):
         try:
+            _before_call(model)
             return await call()
         except errors.APIError as exc:
             if exc.code not in RETRYABLE or delay is None:
@@ -53,9 +73,9 @@ def _friendly(exc: Exception, model: str) -> LLMError:
             # The free tier has a per-minute AND a small per-day limit per model (20 requests/day on
             # gemini-3.6-flash when measured). Say which one, so "wait a minute" isn't wrong advice.
             if "PerDay" in str(exc):
-                hours = re.search(r"retryDelay'?:\s*'(\d+)s", str(exc))
-                when = f" (resets in about {round(int(hours.group(1)) / 3600)} h)" if hours else ""
-                return LLMError(f"Gemini's free daily limit for {model} is used up{when}. "
+                delay = re.search(r"retryDelay'?:\s*'(\d+)s", str(exc))
+                until = quota.mark_exhausted(model, int(delay.group(1)) if delay else None)
+                return LLMError(f"Gemini's free daily limit for {model} is used up ({_reset_text(until)}). "
                                 "Use Local, or set another GEMINI_MODEL", "rate_limited")
             return LLMError("Gemini's free-tier rate limit was hit. Wait a minute, or use Local for now", "rate_limited")
         if exc.code in (401, 403) or (exc.code == 400 and "API key" in str(exc)):
@@ -96,6 +116,7 @@ class GeminiProvider(LLMProvider):
             for delay in (*RETRY_DELAYS, None):
                 sent = False
                 try:
+                    _before_call(self.model)
                     stream = await _get_client().aio.models.generate_content_stream(
                         model=self.model, contents=contents, config=config
                     )
@@ -130,7 +151,8 @@ class GeminiProvider(LLMProvider):
         )
         try:
             res = await _retrying(
-                lambda: _get_client().aio.models.generate_content(model=self.model, contents=user, config=config)
+                lambda: _get_client().aio.models.generate_content(model=self.model, contents=user, config=config),
+                self.model,
             )
             return schema.model_validate_json(res.text or "")
         except ValidationError as exc:
@@ -146,7 +168,8 @@ class GeminiProvider(LLMProvider):
             res = await _retrying(
                 lambda: _get_client().aio.models.generate_content(
                     model=self.model, contents=contents, config=types.GenerateContentConfig(temperature=0)
-                )
+                ),
+                self.model,
             )
             return (res.text or "").strip()
         except LLMError:

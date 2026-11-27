@@ -25,7 +25,7 @@ export default function SnapDoubt({ spaceId, onSolve, onCancel }) {
   const [usedModel, setUsedModel] = useState(null);
 
   // Cloud reads photos best; local only if a vision model is installed (slower, weaker on handwriting).
-  const visionCloud = providers.vision?.cloud;
+  const visionCloud = providers.vision?.cloud && !providers.cloud.quota?.exhausted; // not when today's limit is used up
   const visionLocal = providers.vision?.local;
   const [visionMode, setVisionMode] = useState(visionCloud ? 'cloud' : 'local');
   useEffect(() => setVisionMode(visionCloud ? 'cloud' : 'local'), [visionCloud]);
@@ -147,7 +147,9 @@ export default function SnapDoubt({ spaceId, onSolve, onCancel }) {
                       }}
                       className="rounded border border-rule bg-card px-1 py-0.5 text-xs text-ink"
                     >
-                      <option value="cloud" disabled={!visionCloud}>Cloud{visionCloud ? '' : ' (not set up)'}</option>
+                      <option value="cloud" disabled={!visionCloud}>
+                        Cloud{visionCloud ? '' : providers.cloud.quota?.exhausted ? ' (daily limit reached)' : ' (not set up)'}
+                      </option>
                       <option value="local" disabled={!visionLocal}>Local{visionLocal ? '' : ' (no vision model)'}</option>
                     </select>
                   </span>

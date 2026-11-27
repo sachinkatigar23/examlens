@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import Dialog from '../components/Dialog.jsx';
 import Button from '../components/Button.jsx';
 import { useAuth } from './AuthContext.jsx';
-import { getProviders, updateSettings } from '../api/settings.js';
+import { CLOUD_USED, getProviders, updateSettings } from '../api/settings.js';
 
 // Which chat models are available (Local = Ollama, Cloud = Gemini), the user's default, and the one-time
 // privacy note shown before Cloud is used for the first time.
@@ -20,6 +20,13 @@ export function ModelProvider({ children }) {
   const refresh = useCallback(() => getProviders().then(setProviders).catch(() => {}), []);
   useEffect(() => {
     refresh();
+    // Every Cloud call changes today's quota (see api/ask.js); coming back to the tab may be hours later.
+    window.addEventListener(CLOUD_USED, refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener(CLOUD_USED, refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, [refresh]);
 
   const defaultMode = user?.settings?.defaultMode === 'cloud' && providers.cloud.available ? 'cloud' : 'local';

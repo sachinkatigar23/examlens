@@ -6,7 +6,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
-RUN useradd --create-home --uid 1001 app
+# data/ holds small runtime state (today's Cloud usage); docker-compose mounts a named volume there.
+RUN useradd --create-home --uid 1001 app && mkdir -p /app/data && chown app /app/data
 USER app
 
 EXPOSE 8000
