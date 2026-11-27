@@ -1,5 +1,7 @@
 # ExamLens
 
+[![CI](https://github.com/sachinkatigar23/examlens/actions/workflows/ci.yml/badge.svg)](https://github.com/sachinkatigar23/examlens/actions/workflows/ci.yml)
+
 > **Know what's coming. Study what matters.**
 
 ExamLens is a private exam tutor for university students. Upload one subject's **syllabus**, **unit notes**, **past
@@ -227,7 +229,20 @@ Use either the full Docker stack or the dev servers at one time: both use the sa
 
 ### Tests
 
-The Postman collection in [postman/](postman/) covers every route, with assertions (auth, validation errors,
+**Automated (CI).** [GitHub Actions](.github/workflows/ci.yml) runs on every push and pull request: ESLint for the
+server and client, a client build, `ruff` for the AI service, and the server test suite (`node:test`). The server
+tests need only MongoDB, not Ollama or the AI service: auth with refresh-token rotation and reuse detection,
+notebook ownership (another user always gets 404), uploads (wrong file types, fake PDFs, a clean failure when the
+AI service is down), validation, and the planner / weak-topic formulas. Locally:
+
+```bash
+docker compose up -d mongo            # the tests use their own database, examlens_test
+cd server && npm test && npm run lint
+cd client && npm run lint
+cd ai-service && .venv/Scripts/pip install -r requirements-dev.txt && .venv/Scripts/ruff check app
+```
+
+**End to end (Postman).** The Postman collection in [postman/](postman/) covers every route, with assertions (auth, validation errors,
 uploads, ownership, SSE, analysis, and a Tier 2 folder for the planner, Check my answer and revision sheets that
 runs in Local mode only, so it uses no Cloud quota). Run it from the repo root (fixture paths are relative to it):
 
@@ -266,13 +281,15 @@ Base `/api/v1`, JSON, errors as `{ "error": { "code", "message" } }`.
 ```
 examlens/
 ├── client/        React app (pages, components, hooks, api, three/ for the 3D landing), Dockerfile + nginx.conf
-├── server/        Express API: config, models, controllers, routes, middleware, services, validators
+├── server/        Express API: config, models, controllers, routes, middleware, services, validators; test/
 ├── ai-service/    FastAPI: routers (ingest, ask, study, rematch, documents, health) and services (pdf, chunking,
 │                  embeddings, qdrant, llm/ providers, syllabus, questions, important, matching, units,
 │                  retrieval, answer, lesson, check, revision, vision, ingest)
 ├── scripts/       seed-demo.mjs
+├── demo-data/     shareable Computer Networks demo set (syllabus, model papers, notes, important questions)
 ├── postman/       API collection + fixtures
 ├── docs/          BUILD_NOTES.md (decisions and measurements), screenshots/
+├── .github/       CI workflow (lint + server tests)
 └── docker-compose.yml
 ```
 
@@ -285,7 +302,7 @@ v2:
 - Share notebooks with classmates (viewer / editor roles)
 - OCR for scanned papers
 - Kannada and Hindi question papers
-- GitHub Actions CI (lint, Postman run against the Docker stack)
+- CI end-to-end run: the Postman collection against the Docker stack (needs a GPU runner or a mocked LLM)
 
 ## Credits
 
