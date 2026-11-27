@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BookOpen, Check, CircleDashed, GraduationCap, Printer, RefreshCw, Square } from 'lucide-react';
 import Markdown from './Markdown.jsx';
 import ModeToggle from './ModeToggle.jsx';
@@ -50,6 +50,18 @@ export default function StudyTab({ spaceId }) {
     loadPlan();
     return () => abortRef.current?.abort();
   }, [loadPlan]);
+
+  // "?tab=study&topic=<id>" (from Weak topics in the Analyzer) opens that topic in its unit.
+  const [params] = useSearchParams();
+  const linkedTopic = params.get('topic');
+  useEffect(() => {
+    if (!plan || !linkedTopic || teaching) return;
+    const home = plan.units.find((u) => u.topics.some((t) => t._id === linkedTopic));
+    if (home) {
+      setUnitName(home.unit);
+      setTopicId(linkedTopic);
+    }
+  }, [plan, linkedTopic, teaching]);
 
   const unit = plan?.units.find((u) => u.unit === unitName);
   const topic = unit?.topics.find((t) => t._id === topicId) ?? null;

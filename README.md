@@ -41,7 +41,9 @@ choose it.
 - **Analyzer:** a topics × years heatmap of your past papers. Hot topics are ranked by how many different years
   they were asked in, then by marks. "Asked again" lists questions that appear in more than one year's paper. Click
   any cell to see the actual questions, and move a question to another topic if the match is wrong (low-confidence
-  matches are flagged for review).
+  matches are flagged for review). **Weak topics** lists what is asked often but isn't ready yet: past-paper years
+  and question-bank count against whether you've studied it and your Check-my-answer scores for that topic, with
+  one click to study it.
 - **Ask your notes:** retrieval-augmented answers from your **notes only**, rendered as Markdown (headings, tables,
   highlighted code). Say "for 10 marks" and the answer takes that shape. Every fact carries a `p. 14` sticker;
   hover it to see the passage it came from. If your notes don't cover the question, ExamLens says so instead of

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { listQuestions, moveQuestion } from '../api/analysis.js';
 import AnswerToggle from './AnswerToggle.jsx';
+import TopicSelect from './TopicSelect.jsx';
 import { errorMessage } from '../api/client.js';
 
 // The actual questions behind a heatmap cell (or the unmatched / low-confidence ones).
@@ -58,8 +59,6 @@ function QuestionRow({ spaceId, question, topics, showYear, onMoved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const changed = choice !== (q.topic ?? '');
-  const units = [...new Set(topics.map((t) => t.unit))];
-  const selectId = `topic-${q._id}`;
 
   async function save() {
     setSaving(true);
@@ -85,22 +84,12 @@ function QuestionRow({ spaceId, question, topics, showYear, onMoved }) {
         {q.marks && <span className="shrink-0 font-mono text-xs text-pen">[{q.marks}]</span>}
       </div>
       <div className="mt-2 ml-19 flex flex-wrap items-center gap-2">
-        <label htmlFor={selectId} className="sr-only">Topic for this question</label>
-        <select
-          id={selectId}
+        <TopicSelect
+          id={`topic-${q._id}`}
           value={choice}
-          onChange={(e) => setChoice(e.target.value)}
-          className="max-w-full rounded-md border border-rule bg-card px-2 py-1 text-xs text-ink focus:border-pen focus:outline-none sm:max-w-72"
-        >
-          <option value="">No topic</option>
-          {units.map((unit) => (
-            <optgroup key={unit} label={unit}>
-              {topics.filter((t) => t.unit === unit).map((t) => (
-                <option key={t.topicId} value={t.topicId}>{t.name}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={setChoice}
+          topics={topics.map((t) => ({ id: t.topicId, unit: t.unit, name: t.name }))}
+        />
         {changed && (
           <button
             onClick={save}

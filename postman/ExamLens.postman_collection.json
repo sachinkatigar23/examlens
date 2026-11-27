@@ -82,6 +82,10 @@
     {
       "key": "checkId",
       "value": ""
+    },
+    {
+      "key": "bankTopicId",
+      "value": ""
     }
   ],
   "item": [
@@ -1272,7 +1276,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('has the analyzer shape', () => pm.expect(pm.response.json()).to.include.keys('years', 'topics', 'hotTopics', 'repeats', 'unmatched'));"
+                  "pm.test('has the analyzer shape', () => pm.expect(pm.response.json()).to.include.keys('years', 'topics', 'hotTopics', 'repeats', 'unmatched'));",
+                  "pm.test('has weak topics', () => pm.expect(pm.response.json().weakTopics).to.be.an('array'));"
                 ]
               }
             }
@@ -1773,7 +1778,8 @@
                   "pm.test('units from the UNIT headings', () => pm.expect(b.units.map(u => u.unit)).to.include.members(['Unit 1', 'Unit 2']));",
                   "pm.test('marks from the group headings', () => pm.expect(b.questions.find(q => /congestion/i.test(q.text)).marks).to.eql(10));",
                   "const two = b.questions.find(q => /routing/i.test(q.text));",
-                  "pm.collectionVariables.set('questionId', two._id);"
+                  "pm.collectionVariables.set('questionId', two._id);",
+                  "const bankTopics = pm.response.json().topics; if (bankTopics.length) pm.collectionVariables.set('bankTopicId', bankTopics.at(-1)._id);"
                 ]
               }
             }
@@ -1865,6 +1871,64 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Move bank question to another topic (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"topicId\":\"{{bankTopicId}}\"}"
+            },
+            "url": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json().question;",
+                  "pm.test('moved and locked', () => { pm.expect(q.topic).to.eql(pm.collectionVariables.get('bankTopicId')); pm.expect(q.topicLocked).to.be.true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Move to a topic of another notebook (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"topicId\":\"000000000000000000000000\"}"
+            },
+            "url": "{{baseUrl}}/spaces/{{spaceId}}/questions/{{questionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
                 ]
               }
             }

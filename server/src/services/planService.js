@@ -19,7 +19,7 @@ export const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z
 export const serverToday = () => new Date().toISOString().slice(0, 10);
 
 // Topics the student has finished: ticked in Study mode, or ticked in the plan (kept across re-plans).
-async function studiedTopicIds(spaceId) {
+export async function studiedTopicIds(spaceId) {
   const [lessons, plan] = await Promise.all([
     Lesson.find({ space: spaceId, studied: true }).distinct('topic'),
     StudyPlan.findOne({ space: spaceId }).lean(),
@@ -28,7 +28,7 @@ async function studiedTopicIds(spaceId) {
 }
 
 // { topicId: { paperYears, maxMarks, bankCount } }
-async function topicStats(spaceId) {
+export async function topicStats(spaceId) {
   const rows = await Question.aggregate([
     { $match: { space: spaceId, topic: { $ne: null } } },
     {

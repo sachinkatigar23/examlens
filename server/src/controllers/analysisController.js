@@ -2,10 +2,12 @@ import mongoose from 'mongoose';
 import { PAPERS_ONLY, Question } from '../models/Question.js';
 import { Topic } from '../models/Topic.js';
 import { LOW_CONFIDENCE_SCORE, analyseSpace, isLowConfidence } from '../services/analysisService.js';
+import { findWeakTopics } from '../services/weakTopicService.js';
 import { AppError, notFound } from '../utils/AppError.js';
 
 export async function getAnalysis(req, res) {
-  res.json(await analyseSpace(req.space._id));
+  const [analysis, weakTopics] = await Promise.all([analyseSpace(req.space._id), findWeakTopics(req.space._id)]);
+  res.json({ ...analysis, weakTopics });
 }
 
 // GET /spaces/:spaceId/questions?topic=<id|none>&year=2023&confidence=low
@@ -42,14 +44,15 @@ export async function moveQuestion(req, res) {
 
   const { topicId } = req.body;
   // The topic must belong to the same space, or one user could link to another user's topics.
-  if (topicId && !(await Topic.exists({ _id: topicId, space: req.space._id }))) throw notFound('Topic');
+  const topic = topicId ? await Topic.findOne({ _id: topicId, space: req.space._id }).select('unit').lean() : null;
+  if (topicId && !topic) throw notFound('Topic');
 
-  const question = await Question.findOneAndUpdate(
-    { _id: questionId, space: req.space._id },
-    { topic: topicId, topicLocked: true, matchScore: null },
-    { returnDocument: 'after' },
-  ).lean();
+  const question = await Question.findOne({ _id: questionId, space: req.space._id });
   if (!question) throw notFound('Question');
+  question.set({ topic: topicId, topicLocked: true, matchScore: null });
+  // Question bank questions are listed under their unit, so they follow the topic into its unit.
+  if (question.kind === 'important' && topic) question.unit = topic.unit;
+  await question.save();
 
-  res.json({ question: { ...question, lowConfidence: false } });
+  res.json({ question: { ...question.toObject(), lowConfidence: false } });
 }

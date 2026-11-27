@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import FormError from './FormError.jsx';
 import Heatmap from './Heatmap.jsx';
 import QuestionPanel from './QuestionPanel.jsx';
+import WeakTopics from './WeakTopics.jsx';
 import AnswerToggle from './AnswerToggle.jsx';
 import { getAnalysis } from '../api/analysis.js';
 import { errorMessage } from '../api/client.js';
@@ -27,10 +28,14 @@ export default function AnalyzerTab({ spaceId }) {
 
   if (data.paperCount === 0) {
     return (
-      <Empty
-        title="No past papers yet."
-        text="Upload a few previous years' question papers in Documents (with the year), plus the syllabus. The more years, the clearer the pattern."
-      />
+      <div className="space-y-12">
+        <Empty
+          title="No past papers yet."
+          text="Upload a few previous years' question papers in Documents (with the year), plus the syllabus. The more years, the clearer the pattern."
+        />
+        {/* Without papers, the question bank alone can still say which topics need work. */}
+        {data.weakTopics.length > 0 && <WeakTopics topics={data.weakTopics} paperCount={0} />}
+      </div>
     );
   }
 
@@ -96,6 +101,8 @@ export default function AnalyzerTab({ spaceId }) {
           )}
         </section>
       )}
+
+      {data.topics.length > 0 && <WeakTopics topics={data.weakTopics} paperCount={data.paperCount} />}
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         {data.hotTopics.length > 0 && <HotTopics topics={data.hotTopics} paperCount={data.paperCount} />}

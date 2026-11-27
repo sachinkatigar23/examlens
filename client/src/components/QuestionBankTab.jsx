@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, ChevronDown, PenLine, Printer, Square } from 'lucide-react';
+import { ArrowRightLeft, Check, ChevronDown, PenLine, Printer, Square } from 'lucide-react';
 import ExamAnswer from './ExamAnswer.jsx';
 import ModeToggle from './ModeToggle.jsx';
 import FormError from './FormError.jsx';
 import Button from './Button.jsx';
+import TopicSelect from './TopicSelect.jsx';
+import { moveQuestion } from '../api/analysis.js';
 import { getBank, getJob, setMarks, startAnswerAll, stopJob } from '../api/bank.js';
 import { errorMessage } from '../api/client.js';
 import { useModeState } from '../context/ModelContext.jsx';
@@ -140,7 +142,7 @@ export default function QuestionBankTab({ spaceId }) {
                   <h4 className="font-mono text-xs tracking-wider text-pen uppercase">{t.name}</h4>
                   <ul className="mt-2 divide-y divide-rule rounded-md border border-rule bg-card">
                     {t.questions.map((q) => (
-                      <QuestionRow key={q._id} spaceId={spaceId} question={q} mode={mode} onChange={load} />
+                      <QuestionRow key={q._id} spaceId={spaceId} question={q} topics={bank.topics} mode={mode} onChange={load} />
                     ))}
                   </ul>
                 </div>
@@ -181,9 +183,10 @@ function groupBank(bank, onlyUnit) {
     .filter((g) => g.topics.length);
 }
 
-function QuestionRow({ spaceId, question, mode, onChange }) {
+function QuestionRow({ spaceId, question, topics, mode, onChange }) {
   const [q, setQ] = useState(question);
   const [open, setOpen] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [saving, setSaving] = useState(false);
   useEffect(() => setQ(question), [question]);
 
@@ -233,6 +236,16 @@ function QuestionRow({ spaceId, question, mode, onChange }) {
             Exam answer
             <ChevronDown size={12} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
+          {topics.length > 0 && (
+            <button
+              onClick={() => setMoving((m) => !m)}
+              aria-expanded={moving}
+              className="inline-flex items-center gap-1 rounded-md border border-ink/20 px-2 py-1 text-xs font-medium text-ink hover:border-ink/50"
+              title="In the wrong topic? Move it"
+            >
+              <ArrowRightLeft size={12} aria-hidden="true" /> Move
+            </button>
+          )}
           <Link
             to={`?tab=check&question=${q._id}`}
             className="inline-flex items-center gap-1 rounded-md border border-ink/20 px-2 py-1 text-xs font-medium text-ink hover:border-ink/50"
@@ -242,12 +255,61 @@ function QuestionRow({ spaceId, question, mode, onChange }) {
           </Link>
         </div>
       </div>
+      {moving && (
+        <MoveToTopic
+          spaceId={spaceId}
+          question={q}
+          topics={topics}
+          onMoved={() => {
+            setMoving(false);
+            onChange(); // regroup: the question may now sit under another unit and topic
+          }}
+        />
+      )}
       {open && (
         <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: 'easeOut' }}>
           <ExamAnswer spaceId={spaceId} question={q} mode={mode} onSaved={onChange} />
         </motion.div>
       )}
     </li>
+  );
+}
+
+// Re-assign a question to another syllabus topic (it also moves to that topic's unit).
+function MoveToTopic({ spaceId, question, topics, onMoved }) {
+  const [choice, setChoice] = useState(question.topic ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    setSaving(true);
+    setError('');
+    try {
+      await moveQuestion(spaceId, question._id, choice || null);
+      onMoved();
+    } catch (err) {
+      setError(errorMessage(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 sm:ml-9">
+      <TopicSelect
+        id={`bank-topic-${question._id}`}
+        value={choice}
+        onChange={setChoice}
+        topics={topics.map((t) => ({ id: t._id, unit: t.unit, name: t.name }))}
+      />
+      <button
+        onClick={save}
+        disabled={saving || choice === (question.topic ?? '')}
+        className="rounded-md bg-ink px-2.5 py-1 text-xs font-medium text-paper disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      {error && <span className="text-xs text-pen">{error}</span>}
+    </div>
   );
 }
 
