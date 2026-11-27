@@ -69,10 +69,9 @@ choose it.
 | ![Night study mode](docs/screenshots/analyzer-dark.png) | ![3D landing, heatmap stage](docs/screenshots/landing-heatmap-dark.png) |
 | **Night study mode** (dark theme) | **Landing:** the 3D pile of papers becomes a heatmap |
 
-The Analyzer screenshots use the Computer Networks demo set in [demo-data/](demo-data/): a sample syllabus and four
-**model papers generated for testing** (2022–2025), not official university papers. Study and Question Bank were
-taken on a real Artificial Intelligence subject (4 units of notes + a question bank, no syllabus); that material is
-not in the repo.
+All screenshots use the demo account and the Computer Networks set in [demo-data/](demo-data/): a sample syllabus,
+four **model papers generated for testing** (2022–2025, not official university papers), short notes per unit and an
+important-questions list. Every answer in them was written by the Local model (`qwen2.5:3b`).
 
 ### Local vs Cloud: what leaves your machine
 
