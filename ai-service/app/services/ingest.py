@@ -88,14 +88,19 @@ async def _ingest_important(req: IngestRequest, pages: list[Page]) -> tuple[list
         raise ValueError("Couldn't find any questions in this PDF")
 
     topics = []
+    derived_topic_of: dict[int, str] = {}  # question index -> the derived topic it was validated into
     if await qdrant.count(qdrant.TOPICS, req.space_id) == 0:
         topics = await _save_topics(req, await derive_topics(questions))
+        derived_topic_of = {i: t["id"] for t in topics for i in t.pop("question_indexes")}
         log.info("no syllabus: derived %s topics from the question bank", len(topics))
 
     matches = await match_topics(req.space_id, [q["text"] for q in questions], [q["unit"] for q in questions])
     vectors = await embed_documents([q["text"] for q in questions])
-    for q, (topic_id, score), vector in zip(questions, matches, vectors, strict=True):
-        q["id"], q["topic_id"], q["match_score"] = new_object_id(), topic_id, score
+    for i, (q, (topic_id, score), vector) in enumerate(zip(questions, matches, vectors, strict=True)):
+        # Derived topics come with their questions already assigned (and checked): plain embedding matching
+        # against short topic names is what put Minimax under "A*" before.
+        chosen = derived_topic_of.get(i, topic_id)
+        q["id"], q["topic_id"], q["match_score"] = new_object_id(), chosen, score if chosen == topic_id else None
         # Year 0 = not a dated paper. A paper question that matches it (now or when uploaded later) shares the
         # group, which gives the "also asked in 2023, 2025" badge.
         q["repeat_group"] = await find_repeat_group(req.space_id, q["text"], vector, 0, req.document_id) or q["id"]

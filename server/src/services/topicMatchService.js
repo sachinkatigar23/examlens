@@ -8,8 +8,16 @@ const BATCH = 200;
 // Re-links every question in the space to its closest current topic. Needed when the syllabus arrives
 // after the papers, or when a syllabus is deleted/replaced.
 export async function rematchSpace(spaceId) {
-  // Questions the student placed by hand keep their topic.
-  const auto = { space: spaceId, topicLocked: { $ne: true } };
+  // Questions the student placed by hand keep their topic. So do question-bank questions inside a topic that
+  // was derived from that bank: the AI service assigned and checked them while deriving (plain embedding
+  // matching against the short topic names put Minimax under "A*"). A real syllabus deletes derived topics,
+  // which clears those links first, so the questions are matched again then.
+  const derived = await Topic.find({ space: spaceId, derived: true }).distinct('_id');
+  const auto = {
+    space: spaceId,
+    topicLocked: { $ne: true },
+    $nor: [{ kind: 'important', topic: { $in: derived } }],
+  };
   const questions = await Question.find(auto).select('text unit').lean();
   if (!questions.length) return;
 
